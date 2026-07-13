@@ -217,7 +217,7 @@ git commit -m "fix: follow the live Codex pet window"
 
 - [ ] **Step 1: Write failing isolated startup assertions**
 
-Extend the fake command directory with `lsappinfo` and `open` recorders. The fake
+Extend the fake command directory with `lsappinfo` and `launchctl` recorders. The fake
 inactive `lsappinfo` must exit zero with empty output, matching the real macOS
 command. Set
 `CODEX_PET_INSTALLED_APP` to a nonexistent temporary path for the local fallback
@@ -226,11 +226,15 @@ case. Assert after repeated installation:
 - `WatchPaths.0` equals `$CODEX_HOME/.codex-global-state.json`;
 - `RunAtLoad`, `KeepAlive`, and polling helpers are absent;
 - `launchctl bootstrap gui/<uid> <plist>` is called;
-- with Codex reported inactive, `open` is not called;
+- with Codex reported inactive, neither `open` nor `kickstart` is called;
 - with a temporary installed bundle executable present and Codex reported active,
-  `ProgramArguments.0` selects that executable and `open -g <installed app>` is called;
+  `ProgramArguments.0` selects that executable and launchd kickstarts the exact
+  service label after exact-process termination;
+- an exact selected process and a late-arriving exact process are terminated,
+  while a same-basename executable at another path remains running;
+- process discovery failure aborts before kickstart;
 - switching path sources and repeated installs still produce one plist and exact
-  bootout/bootstrap operations.
+  bootout/bootstrap/kickstart operations.
 
 - [ ] **Step 2: Run shell verifier and verify RED**
 
@@ -249,10 +253,23 @@ In `InstallStartup.command`:
 - omit `RunAtLoad` and `KeepAlive`;
 - atomically replace the plist;
 - `bootout` the exact plist tolerantly, then `bootstrap` it;
-- capture `lsappinfo find bundleID=com.openai.codex` output tolerantly and run
-  `open -g "$APP"` only when that output is nonempty.
+- repeatedly resolve and terminate only the exact selected executable, rescanning
+  for late arrivals and failing closed if process discovery fails;
+- capture `lsappinfo find bundleID=com.openai.codex` output tolerantly and, only
+  when nonempty, `launchctl kickstart` the exact service label after handoff;
+- when Codex is inactive, leave the job waiting for its `WatchPaths` trigger.
 
 Do not add a polling loop, broad process matching, or privileged command.
+
+#### Runtime amendment: launchd-owned handoff
+
+The initial active-Codex implementation used `open -g`, which could race the
+newly bootstrapped LaunchAgent and briefly create two exact executable
+processes. The reviewed implementation does not call `open`. It terminates only
+the exact selected executable, rescans for a late arrival, fails closed on
+discovery errors, and then hands active-Codex startup to launchd with an exact
+label `kickstart`. Inactive-Codex installation stops any pre-existing exact
+process and waits for `WatchPaths`.
 
 - [ ] **Step 4: Run shell verifier and verify GREEN**
 
@@ -302,7 +319,8 @@ and WatchPaths startup evidence. Commit the record.
 - [ ] **Step 3: Install the verified bundle**
 
 Terminate only the exact installed usage executable, copy the new bundle to
-`/Applications/Codex Pet Usage.app`, verify it, and launch exactly one instance.
+`/Applications/Codex Pet Usage.app`, and verify it. Do not launch it manually;
+the following installer step owns the launch handoff.
 
 - [ ] **Step 4: Register startup on this Mac**
 

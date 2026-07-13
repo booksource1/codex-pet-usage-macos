@@ -63,10 +63,19 @@ state file during launch, no invisible watcher process is added to compensate.
 
 The installer prefers the verified installed executable at
 `/Applications/Codex Pet Usage.app/Contents/MacOS/CodexPetUsage`; if it is not
-present, it builds and uses the repository-local app. When the installer runs
-while the exact `com.openai.codex` application is already active, it also opens
-Codex Pet Usage immediately. Repeated installation remains idempotent and must
-not create duplicate app instances.
+present, it builds and uses the repository-local app. After registering the
+LaunchAgent, the installer repeatedly discovers and terminates only processes
+whose resolved executable is the exact selected executable. It rescans to catch
+late arrivals during handoff and fails closed if exact-process discovery fails.
+Same-basename processes at other paths are left untouched.
+
+When `com.openai.codex` is already active, the installer asks launchd to
+`kickstart` the exact service label only after that handoff. This makes launchd,
+rather than an `open`-launched process, the startup owner and avoids a transient
+duplicate when the newly bootstrapped job races an independently opened app.
+When Codex is inactive, the installer does not launch the app; the LaunchAgent
+waits for its `WatchPaths` state-file trigger. Repeated installation remains
+idempotent and must not create duplicate app instances.
 
 `UninstallStartup.command` continues to unload and remove only this project's
 LaunchAgent. No Codex files are modified.
@@ -114,6 +123,11 @@ Tests are written before production changes and must prove:
 - the overlay layout center moves by exactly the live-origin delta;
 - startup plist uses `WatchPaths`, omits `RunAtLoad`, points at the installed app
   when available, and is bootstrapped idempotently;
+- startup handoff stops only the exact selected executable, catches a late exact
+  process, preserves same-basename decoys, and fails before kickstart if process
+  discovery fails;
+- active-Codex installation uses launchd `kickstart` for the exact service label,
+  while inactive installation waits for `WatchPaths` and never calls `open`;
 - uninstall remains isolated and idempotent;
 - all existing usage, hover, layout, lifecycle, and security tests still pass.
 
