@@ -41,7 +41,9 @@ not activate the app, and does not intercept pointer events.
 
 ## Runtime and packaging
 
-Use Swift Package Manager with Swift and AppKit only. The executable is wrapped
+Use Swift Package Manager with Swift and Apple-provided system frameworks only:
+Foundation for files, JSON, timers, and networking; AppKit/Core Animation for
+the overlay; and the system SQLite library for read-only log access. The executable is wrapped
 in a minimal `.app` bundle for double-click launching, but the repository also
 provides small `start`, `stop`, `status`, `install-startup`, and
 `uninstall-startup` commands analogous to the reference `.bat` entry points.
@@ -53,8 +55,11 @@ target; the code should remain architecture-neutral so an Intel build can be
 produced if the toolchain supports it.
 
 Login startup is optional and disabled by default. Installation uses a
-user-scoped LaunchAgent that runs the installed app without administrator
-privileges. Uninstallation removes only files created by this project.
+user-scoped LaunchAgent that runs the app at its current absolute path without
+administrator privileges, matching the reference project's in-place startup
+registration. `install-startup` does not copy or relocate the bundle. If the
+bundle is moved, the user reruns `install-startup` to update the path.
+Uninstallation removes only files created by this project.
 
 ## Components
 
@@ -71,7 +76,10 @@ fatal.
 
 Accept the current time, pointer-in-expanded-pet state, previous pointer state,
 and current show-until time. It implements the reference behavior as a pure,
-unit-tested component. This avoids coupling timing semantics to AppKit timers.
+unit-tested component. If no pet rectangle is available for any tick, it clears
+both the show-until value and the previous-pointer state before hiding the
+window, exactly as the reference does. This avoids coupling timing semantics to
+AppKit timers.
 
 ### Usage client
 
@@ -96,10 +104,20 @@ directly; do not shell out to Python.
 ### Overlay controller and renderer
 
 An AppKit controller owns two timers: 30 seconds for usage and 100 ms for pet
-position/hover updates. A borderless `NSPanel` renders the rings and text card
-with Core Animation/AppKit drawing. Layout is recomputed from the current pet
-bounds so movement, multiple displays, and display-edge placement follow the
-reference behavior.
+position/hover updates. It refreshes usage and overlay state immediately at
+launch before starting normal timer-driven updates. A borderless `NSPanel`
+renders the rings and text card with Core Animation/AppKit drawing. Layout is
+recomputed from the current pet bounds so movement, multiple displays, and
+display-edge placement follow the reference behavior.
+
+The ring diameter is `max(104, max(petWidth, petHeight) + 52)`. The outer radius
+is half that diameter minus 7 points; the inner radius is 13 points smaller.
+Arcs start at −90 degrees, proceed clockwise, have round line caps, and clamp a
+visible full value to 99.99% to avoid a degenerate 360-degree path. The card has
+a 6-point corner radius, `#0D181E` background at approximately 80% opacity,
+10/8-point horizontal/vertical padding, 12-point primary text, 10-point status
+text, and the exact Chinese strings from the reference. Countdown values round
+remaining seconds upward before formatting days/hours/minutes/seconds.
 
 ### Process and startup commands
 
