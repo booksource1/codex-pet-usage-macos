@@ -1,0 +1,56 @@
+name: Release macOS app
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run Swift tests
+        run: swift run CodexPetUsageTests
+
+      - name: Verify control commands
+        run: bash Tests/Shell/verify-control-commands.sh
+
+      - name: Build app
+        run: APP_VERSION="${GITHUB_REF_NAME#v}" APP_BUILD="$GITHUB_RUN_NUMBER" bash scripts/build-app.sh
+
+      - name: Verify app bundle
+        run: |
+          app="dist/Codex Pet Usage.app"
+          binary="$app/Contents/MacOS/CodexPetUsage"
+          test "$(lipo -archs "$binary")" = "arm64"
+          codesign --verify --deep --strict "$app"
+          plutil -lint "$app/Contents/Info.plist"
+
+      - name: Package release assets
+        run: |
+          release_dir="release"
+          release_zip="$release_dir/Codex-Pet-Usage-macOS.zip"
+          mkdir -p "$release_dir"
+          ditto -c -k --sequesterRsrc --keepParent "dist/Codex Pet Usage.app" "$release_zip"
+          (
+            cd "$release_dir"
+            shasum -a 256 "$(basename "$release_zip")" > "$(basename "$release_zip").sha256"
+          )
+
+      - name: Create GitHub Release
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes
+          fi
+          gh release upload "$GITHUB_REF_NAME" \
+            release/Codex-Pet-Usage-macOS.zip \
+            release/Codex-Pet-Usage-macOS.zip.sha256 \
+            --clobber
