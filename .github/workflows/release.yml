@@ -39,7 +39,17 @@ jobs:
           release_dir="release"
           release_zip="$release_dir/Codex-Pet-Usage-macOS.zip"
           mkdir -p "$release_dir"
-          ditto -c -k --sequesterRsrc --keepParent "dist/Codex Pet Usage.app" "$release_zip"
+          ditto -c -k --norsrc --keepParent "dist/Codex Pet Usage.app" "$release_zip"
+          archive_entries="$(unzip -Z1 "$release_zip")"
+          while IFS= read -r entry; do
+            case "$entry" in
+              "Codex Pet Usage.app"|"Codex Pet Usage.app/"|"Codex Pet Usage.app/"*) ;;
+              *)
+                echo "Archive contains unexpected path: $entry" >&2
+                exit 1
+                ;;
+            esac
+          done <<< "$archive_entries"
           (
             cd "$release_dir"
             shasum -a 256 "$(basename "$release_zip")" > "$(basename "$release_zip").sha256"
