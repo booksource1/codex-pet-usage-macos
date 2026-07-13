@@ -1,3 +1,8 @@
-import Foundation
+import AppKit
+import CodexPetUsageCore
 
-print("Codex Pet Usage scaffold")
+let application = NSApplication.shared
+let coordinator = AppCoordinator(configuration: RuntimeConfiguration())
+application.setActivationPolicy(.accessory)
+application.delegate = coordinator
+application.run()
