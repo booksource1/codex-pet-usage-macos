@@ -66,7 +66,8 @@ The installer prefers the verified installed executable at
 present, it builds and uses the repository-local app. After registering the
 LaunchAgent, the installer repeatedly discovers and terminates only processes
 whose resolved executable is the exact selected executable. It rescans to catch
-late arrivals during handoff and fails closed if exact-process discovery fails.
+late arrivals during handoff, requires three consecutive empty scans before
+declaring the handoff stable, and fails closed if exact-process discovery fails.
 Same-basename processes at other paths are left untouched.
 
 When `com.openai.codex` is already active, the installer asks launchd to
@@ -124,7 +125,8 @@ Tests are written before production changes and must prove:
 - startup plist uses `WatchPaths`, omits `RunAtLoad`, points at the installed app
   when available, and is bootstrapped idempotently;
 - startup handoff stops only the exact selected executable, catches a late exact
-  process, preserves same-basename decoys, and fails before kickstart if process
+  process even after an initially empty scan, requires three consecutive empty
+  scans, preserves same-basename decoys, and fails before kickstart if process
   discovery fails;
 - active-Codex installation uses launchd `kickstart` for the exact service label,
   while inactive installation waits for `WatchPaths` and never calls `open`;

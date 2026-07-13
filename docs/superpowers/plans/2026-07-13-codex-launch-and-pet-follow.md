@@ -231,7 +231,8 @@ case. Assert after repeated installation:
   `ProgramArguments.0` selects that executable and launchd kickstarts the exact
   service label after exact-process termination;
 - an exact selected process and a late-arriving exact process are terminated,
-  while a same-basename executable at another path remains running;
+  including one that appears after an initially empty scan, while a
+  same-basename executable at another path remains running;
 - process discovery failure aborts before kickstart;
 - switching path sources and repeated installs still produce one plist and exact
   bootout/bootstrap/kickstart operations.
@@ -254,7 +255,8 @@ In `InstallStartup.command`:
 - atomically replace the plist;
 - `bootout` the exact plist tolerantly, then `bootstrap` it;
 - repeatedly resolve and terminate only the exact selected executable, rescanning
-  for late arrivals and failing closed if process discovery fails;
+  for late arrivals, requiring three consecutive empty scans before handoff, and
+  failing closed if process discovery fails;
 - capture `lsappinfo find bundleID=com.openai.codex` output tolerantly and, only
   when nonempty, `launchctl kickstart` the exact service label after handoff;
 - when Codex is inactive, leave the job waiting for its `WatchPaths` trigger.
@@ -266,7 +268,8 @@ Do not add a polling loop, broad process matching, or privileged command.
 The initial active-Codex implementation used `open -g`, which could race the
 newly bootstrapped LaunchAgent and briefly create two exact executable
 processes. The reviewed implementation does not call `open`. It terminates only
-the exact selected executable, rescans for a late arrival, fails closed on
+the exact selected executable, requires three consecutive empty scans so a
+process arriving after an initially empty scan is still caught, fails closed on
 discovery errors, and then hands active-Codex startup to launchd with an exact
 label `kickstart`. Inactive-Codex installation stops any pre-existing exact
 process and waits for `WatchPaths`.
