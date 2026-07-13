@@ -23,6 +23,11 @@ let usageDecoderTests: [TestCase] = [
         try expectApproximately(usage?.primaryWindowSeconds, 18_000, "alternative window name should decode")
         try expect(usage?.primaryResetAt == fixedDate().addingTimeInterval(60), "alternative relative reset should decode")
     },
+    TestCase(name: "nullPreferredAliasesFallThroughLikeReference") {
+        let data = jsonData(#"{"rate_limit":null,"rate_limits":{"primary_window":null,"primary":{"remaining_percent":25}}}"#)
+        let usage = try UsageDecoder.decode(data: data, source: .test, now: fixedDate())
+        try expectApproximately(usage?.primaryRemaining, 25, "null preferred aliases should fall through to valid alternatives")
+    },
     TestCase(name: "percentagesClampToZeroThroughOneHundred") {
         let data = jsonData(#"{"rate_limit":{"primary_window":{"remaining_percent":-4},"secondary_window":{"remaining_percent":140}}}"#)
         let usage = try UsageDecoder.decode(data: data, source: .test, now: fixedDate())
@@ -49,6 +54,14 @@ let usageDecoderTests: [TestCase] = [
         try expect(
             usage?.primaryResetAt == Date(timeIntervalSince1970: 1_767_269_400.25),
             "fractional ISO reset should decode like DateTime.Parse"
+        )
+    },
+    TestCase(name: "spaceSeparatedResetMatchesReferenceDateParsing") {
+        let data = jsonData(#"{"rate_limit":{"primary_window":{"remaining_percent":50,"reset_at":"2026-01-01 12:10:00 +0000"}}}"#)
+        let usage = try UsageDecoder.decode(data: data, source: .test, now: fixedDate())
+        try expect(
+            usage?.primaryResetAt == Date(timeIntervalSince1970: 1_767_269_400),
+            "space-separated reset should decode like DateTime.Parse"
         )
     },
     TestCase(name: "durationRoundsUpLikeReference") {

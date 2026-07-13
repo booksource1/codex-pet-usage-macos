@@ -9,13 +9,13 @@ public enum UsageDecoder {
         let object = try JSONSerialization.jsonObject(with: data)
         guard
             let root = object as? [String: Any],
-            let rate = dictionary(root["rate_limit"] ?? root["rate_limits"])
+            let rate = firstDictionary(root["rate_limit"], root["rate_limits"])
         else {
             return nil
         }
 
-        let primary = dictionary(rate["primary_window"] ?? rate["primary"])
-        let secondary = dictionary(rate["secondary_window"] ?? rate["secondary"])
+        let primary = firstDictionary(rate["primary_window"], rate["primary"])
+        let secondary = firstDictionary(rate["secondary_window"], rate["secondary"])
         let primaryRemaining = remaining(in: primary)
         let secondaryRemaining = remaining(in: secondary)
         guard primaryRemaining != nil || secondaryRemaining != nil else {
@@ -35,8 +35,13 @@ public enum UsageDecoder {
         )
     }
 
-    private static func dictionary(_ value: Any?) -> [String: Any]? {
-        value as? [String: Any]
+    private static func firstDictionary(_ values: Any?...) -> [String: Any]? {
+        for value in values {
+            if let dictionary = value as? [String: Any] {
+                return dictionary
+            }
+        }
+        return nil
     }
 
     private static func number(_ value: Any?) -> Double? {
@@ -96,7 +101,30 @@ public enum UsageDecoder {
         if let date = fractional.date(from: text) {
             return date
         }
-        return ISO8601DateFormatter().date(from: text)
+        if let date = ISO8601DateFormatter().date(from: text) {
+            return date
+        }
+
+        let formats = [
+            "yyyy-MM-dd HH:mm:ss Z",
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy/M/d H:mm:ss Z",
+            "yyyy/M/d H:mm:ss",
+            "M/d/yyyy h:mm:ss a Z",
+            "M/d/yyyy h:mm:ss a",
+            "EEE, dd MMM yyyy HH:mm:ss zzz",
+        ]
+        for format in formats {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.dateFormat = format
+            formatter.isLenient = false
+            if let date = formatter.date(from: text) {
+                return date
+            }
+        }
+        return nil
     }
 }
 

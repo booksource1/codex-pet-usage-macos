@@ -67,6 +67,19 @@ run_command() {
   "$@"
 }
 
+exact_process_count() {
+  local expected candidate process_command observed
+  expected=$(realpath "$EXECUTABLE")
+  ps -ax -o pid=,comm= | while read -r candidate process_command; do
+    case "$process_command" in
+      */CodexPetUsage|CodexPetUsage)
+        observed=$(realpath "$process_command" 2>/dev/null || true)
+        if test "$observed" = "$expected"; then printf '%s\n' "$candidate"; fi
+        ;;
+    esac
+  done | wc -l | tr -d '[:space:]'
+}
+
 echo 999999 > "$APP_SUPPORT/overlay.pid"
 run_command "$ROOT/Start.command" >/dev/null
 RUNNING_PID=$(tr -d '[:space:]' < "$APP_SUPPORT/overlay.pid")
@@ -74,6 +87,15 @@ test "$RUNNING_PID" != "999999" && kill -0 "$RUNNING_PID" 2>/dev/null || fail "s
 
 run_command "$ROOT/Start.command" >/dev/null
 test "$(tr -d '[:space:]' < "$APP_SUPPORT/overlay.pid")" = "$RUNNING_PID" || fail "repeated start did not reuse the process"
+
+open -n -g "$APP" \
+  --env "HOME=$TEST_HOME" \
+  --env "CODEX_HOME=$CODEX_HOME" \
+  --env "CODEX_PET_APP_SUPPORT_DIR=$APP_SUPPORT"
+sleep 0.5
+EXACT_PROCESS_COUNT=$(exact_process_count)
+test "$EXACT_PROCESS_COUNT" = "1" || fail "the app allowed a second exact executable instance"
+test "$(tr -d '[:space:]' < "$APP_SUPPORT/overlay.pid")" = "$RUNNING_PID" || fail "a duplicate launch replaced the owner PID"
 
 rm -f "$APP_SUPPORT/overlay.pid"
 STATUS_WITHOUT_PID=$(run_command "$ROOT/Status.command")
@@ -118,6 +140,7 @@ test "$(plutil -extract EnvironmentVariables.CODEX_HOME raw "$PLIST")" = "$CODEX
 test "$(plutil -extract EnvironmentVariables.CODEX_PET_USAGE_POLL_SECONDS raw "$PLIST")" = "45" || fail "startup usage polling value is wrong"
 test "$(plutil -extract EnvironmentVariables.CODEX_PET_POLL_MS raw "$PLIST")" = "250" || fail "startup pet polling value is wrong"
 test "$(plutil -extract EnvironmentVariables.CODEX_PET_HOVER_PADDING raw "$PLIST")" = "42" || fail "startup hover padding is wrong"
+test "$(plutil -extract EnvironmentVariables.CODEX_PET_APP_SUPPORT_DIR raw "$PLIST")" = "$APP_SUPPORT" || fail "startup app support override is wrong"
 if plutil -extract KeepAlive raw "$PLIST" >/dev/null 2>&1; then
   fail "startup must not restart the app after Stop.command"
 fi

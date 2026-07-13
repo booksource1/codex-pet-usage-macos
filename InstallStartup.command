@@ -26,6 +26,9 @@ plutil -insert EnvironmentVariables.CODEX_HOME -string "$CODEX_HOME_VALUE" "$TEM
 plutil -insert EnvironmentVariables.CODEX_PET_USAGE_POLL_SECONDS -string "$USAGE_POLL_SECONDS" "$TEMP_PLIST"
 plutil -insert EnvironmentVariables.CODEX_PET_POLL_MS -string "$PET_POLL_MS" "$TEMP_PLIST"
 plutil -insert EnvironmentVariables.CODEX_PET_HOVER_PADDING -string "$HOVER_PADDING" "$TEMP_PLIST"
+if test -n "${CODEX_PET_APP_SUPPORT_DIR:-}"; then
+  plutil -insert EnvironmentVariables.CODEX_PET_APP_SUPPORT_DIR -string "$APP_SUPPORT_DIR" "$TEMP_PLIST"
+fi
 plutil -insert RunAtLoad -bool true "$TEMP_PLIST"
 plutil -insert StandardOutPath -string "$APP_SUPPORT_DIR/overlay.log" "$TEMP_PLIST"
 plutil -insert StandardErrorPath -string "$APP_SUPPORT_DIR/overlay.log" "$TEMP_PLIST"

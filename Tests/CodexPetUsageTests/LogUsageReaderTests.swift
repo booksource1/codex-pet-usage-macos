@@ -62,6 +62,16 @@ let logUsageReaderTests: [TestCase] = [
         let usage = LogUsageReader.read(paths: [missing, url], now: fixedDate())
         try expectApproximately(usage?.primaryRemaining, 75, "reader should try next existing database")
     },
+    TestCase(name: "sqliteDoesNotFallThroughAfterFirstMatchingRow") {
+        let first = try makeLogDatabase(rows: [(2, #"{"type":"codex.rate_limits","rate_limits":{}}"#)])
+        let second = try makeLogDatabase(rows: [(1, newBody)])
+        defer {
+            try? FileManager.default.removeItem(at: first)
+            try? FileManager.default.removeItem(at: second)
+        }
+        let usage = LogUsageReader.read(paths: [first, second], now: fixedDate())
+        try expect(usage == nil, "a matching row in the first database should decide the fallback result")
+    },
     TestCase(name: "sqliteMissingOrCorruptReturnsNil") {
         let missing = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try expect(LogUsageReader.read(paths: [missing], now: fixedDate()) == nil, "missing database should return nil")

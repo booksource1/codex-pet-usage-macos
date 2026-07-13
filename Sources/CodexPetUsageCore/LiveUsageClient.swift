@@ -77,13 +77,16 @@ public final class LiveUsageClient: @unchecked Sendable {
         }
     }
 
-    public func fetch(authURL: URL, now: Date = Date()) async throws -> UsageSnapshot? {
+    public func fetch(
+        authURL: URL,
+        now: @Sendable () -> Date = Date.init
+    ) async throws -> UsageSnapshot? {
         let authData = try Data(contentsOf: authURL)
         guard let token = try Self.accessToken(from: authData) else { return nil }
         let request = try Self.makeRequest(accessToken: token)
         let (data, response) = try await session.data(for: request)
         try Self.validate(response: response)
-        return try UsageDecoder.decode(data: data, source: .live, now: now)
+        return try UsageDecoder.decode(data: data, source: .live, now: now())
     }
 }
 

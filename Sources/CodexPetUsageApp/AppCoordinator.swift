@@ -11,6 +11,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
     private var usageTimer: Timer?
     private var petTimer: Timer?
     private var usageTask: Task<Void, Never>?
+    private var refreshGate = RefreshGate()
     private var hoverState = HoverState()
     private var usageSnapshot = UsageSnapshot.unavailable(now: Date())
 
@@ -20,6 +21,11 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if anotherExactInstanceIsRunning() {
+            NSApplication.shared.terminate(nil)
+            return
+        }
+
         do {
             logger = try AppLogger()
         } catch {
@@ -76,10 +82,16 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
     }
 
     @objc private func refreshUsage() {
+        guard refreshGate.begin() else { return }
         let service = usageService
         usageTask = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                refreshGate.end()
+                usageTask = nil
+            }
             let snapshot = await service.refresh()
-            guard !Task.isCancelled, let self else { return }
+            guard !Task.isCancelled else { return }
             usageSnapshot = snapshot
             if snapshot.available {
                 log(String(
@@ -142,6 +154,17 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
 
     private func primaryScreenMaxY() -> CGFloat {
         NSScreen.screens.first?.frame.maxY ?? 0
+    }
+
+    private func anotherExactInstanceIsRunning() -> Bool {
+        guard let executable = Bundle.main.executableURL?.resolvingSymlinksInPath() else {
+            return false
+        }
+        let currentPID = ProcessInfo.processInfo.processIdentifier
+        return NSWorkspace.shared.runningApplications.contains { application in
+            application.processIdentifier != currentPID
+                && application.executableURL?.resolvingSymlinksInPath() == executable
+        }
     }
 
     private func log(_ candidate: String) {

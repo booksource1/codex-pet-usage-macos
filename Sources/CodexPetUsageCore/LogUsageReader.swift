@@ -45,9 +45,7 @@ public enum LogUsageReader {
     public static func read(paths: [URL], now: Date = Date()) -> UsageSnapshot? {
         for path in paths where FileManager.default.fileExists(atPath: path.path) {
             guard let body = newestRateLimitBody(path: path) else { continue }
-            if let usage = try? decode(body: body, now: now) {
-                return usage
-            }
+            return try? decode(body: body, now: now)
         }
         return nil
     }
