@@ -1,7 +1,7 @@
 import Darwin
 import Foundation
 
-let allTests = packageSmokeTests + usageDecoderTests + logUsageReaderTests + liveUsageClientTests
+let allTests = packageSmokeTests + usageDecoderTests + logUsageReaderTests + liveUsageClientTests + codexStateReaderTests
 let filter = CommandLine.arguments.dropFirst().first
 let selectedTests = allTests.filter { test in
     filter.map { test.name.localizedCaseInsensitiveContains($0) } ?? true
