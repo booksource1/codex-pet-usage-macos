@@ -23,32 +23,35 @@ trap cleanup_temp_plist EXIT
 
 find_expected_pids() {
   local expected pid command observed
-  expected=$(realpath "$EXECUTABLE" 2>/dev/null) || return 0
+  expected=$(realpath "$EXECUTABLE" 2>/dev/null) || return 1
   ps -ax -o pid=,comm= | while read -r pid command; do
     case "$command" in
       */CodexPetUsage|CodexPetUsage)
-        observed=$(realpath "$command" 2>/dev/null || true)
-        if test -n "$observed" && test "$observed" = "$expected"; then printf '%s\n' "$pid"; fi
+        observed=$(realpath "$command" 2>/dev/null) || return 1
+        if test "$observed" = "$expected"; then printf '%s\n' "$pid"; fi
         ;;
     esac
   done
 }
 
 stop_expected_processes() {
-  local found pid remaining
+  local pid remaining
   for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-    found=0
+    if ! remaining=$(find_expected_pids); then
+      echo "Codex Pet Usage exact-process discovery failed." >&2
+      return 1
+    fi
+    if test -z "$remaining"; then return 0; fi
     while read -r pid; do
-      if test -n "$pid"; then
-        found=1
-        kill -TERM "$pid" 2>/dev/null || true
-      fi
-    done < <(find_expected_pids)
-    if test "$found" = "0"; then return 0; fi
+      if test -n "$pid"; then kill -TERM "$pid" 2>/dev/null || true; fi
+    done <<< "$remaining"
     sleep 0.1
   done
 
-  remaining=$(find_expected_pids)
+  if ! remaining=$(find_expected_pids); then
+    echo "Codex Pet Usage exact-process discovery failed." >&2
+    return 1
+  fi
   if test -z "$remaining"; then return 0; fi
   echo "Codex Pet Usage exact process did not stop." >&2
   return 1

@@ -153,8 +153,16 @@ SH
 chmod +x "$FAKE_BIN/open"
 cat > "$FAKE_BIN/ps" <<'SH'
 #!/bin/bash
-/bin/ps "$@"
-if test -n "${LATE_EXECUTABLE:-}" && test ! -e "$LATE_SPAWN_MARKER"; then
+if test "${PS_FAIL:-0}" = "1"; then
+  exit 73
+fi
+if test -n "${LATE_EXECUTABLE:-}"; then
+  late_scan_count=0
+  if test -f "$LATE_SCAN_COUNT_FILE"; then read -r late_scan_count < "$LATE_SCAN_COUNT_FILE"; fi
+  late_scan_count=$((late_scan_count + 1))
+  printf '%s\n' "$late_scan_count" > "$LATE_SCAN_COUNT_FILE"
+fi
+if test "${late_scan_count:-0}" = "2" && test ! -e "$LATE_SPAWN_MARKER"; then
   touch "$LATE_SPAWN_MARKER"
   for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
     kill -0 "$FIRST_HANDOFF_PID" 2>/dev/null || break
@@ -165,7 +173,9 @@ if test -n "${LATE_EXECUTABLE:-}" && test ! -e "$LATE_SPAWN_MARKER"; then
   CODEX_PET_APP_SUPPORT_DIR="$LATE_SUPPORT" \
   "$LATE_EXECUTABLE" >/dev/null 2>&1 &
   printf '%s\n' "$!" > "$LATE_PID_FILE"
+  /bin/sleep 0.05
 fi
+/bin/ps "$@"
 SH
 chmod +x "$FAKE_BIN/ps"
 export LAUNCH_LOG OPEN_LOG
@@ -206,6 +216,16 @@ for install in 1 2; do
 done
 cmp -s "$EXPECTED_LAUNCH_LOG" "$LAUNCH_LOG" || fail "local startup install made unexpected launchctl calls or split arguments"
 test ! -e "$OPEN_LOG" || fail "inactive Codex caused the app to open"
+
+SAVED_LAUNCH_LOG="$TEST_ROOT/launchctl-before-ps-failure.log"
+cp "$LAUNCH_LOG" "$SAVED_LAUNCH_LOG"
+if CODEX_PET_INSTALLED_APP="$LOCAL_ONLY_APP" LSAPPINFO_ACTIVE=1 PS_FAIL=1 run_command "$ROOT/InstallStartup.command" >/dev/null 2>&1; then
+  fail "startup install succeeded after exact-process discovery failed"
+fi
+if rg -Fqx 'ARG:kickstart' "$LAUNCH_LOG"; then
+  fail "startup install kickstarted after exact-process discovery failed"
+fi
+cp "$SAVED_LAUNCH_LOG" "$LAUNCH_LOG"
 
 INSTALLED_APP="$TEST_ROOT/Applications/Codex Pet Usage.app"
 INSTALLED_EXECUTABLE="$INSTALLED_APP/Contents/MacOS/CodexPetUsage"
@@ -252,12 +272,14 @@ kill -0 "$HANDOFF_PID" 2>/dev/null || fail "isolated installed executable did no
 LATE_SUPPORT="$TEST_ROOT/late support"
 LATE_PID_FILE="$TEST_ROOT/late.pid"
 LATE_SPAWN_MARKER="$TEST_ROOT/late-spawned"
+LATE_SCAN_COUNT_FILE="$TEST_ROOT/late-scan-count"
 mkdir -p "$LATE_SUPPORT"
 LATE_EXECUTABLE="$INSTALLED_EXECUTABLE" \
 FIRST_HANDOFF_PID="$HANDOFF_PID" \
 LATE_SUPPORT="$LATE_SUPPORT" \
 LATE_PID_FILE="$LATE_PID_FILE" \
 LATE_SPAWN_MARKER="$LATE_SPAWN_MARKER" \
+LATE_SCAN_COUNT_FILE="$LATE_SCAN_COUNT_FILE" \
 CODEX_PET_INSTALLED_APP="$INSTALLED_APP" \
 LSAPPINFO_ACTIVE=1 \
 run_command "$ROOT/InstallStartup.command" >/dev/null
