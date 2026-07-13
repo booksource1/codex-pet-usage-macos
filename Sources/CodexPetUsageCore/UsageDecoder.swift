@@ -4,7 +4,8 @@ public enum UsageDecoder {
     public static func decode(
         data: Data,
         source: UsageSource,
-        now: Date = Date()
+        now: Date = Date(),
+        locale: Locale = .current
     ) throws -> UsageSnapshot? {
         let object = try JSONSerialization.jsonObject(with: data)
         guard
@@ -27,8 +28,8 @@ public enum UsageDecoder {
             source: source,
             primaryRemaining: primaryRemaining,
             secondaryRemaining: secondaryRemaining,
-            primaryResetAt: resetDate(in: primary, now: now),
-            secondaryResetAt: resetDate(in: secondary, now: now),
+            primaryResetAt: resetDate(in: primary, now: now, locale: locale),
+            secondaryResetAt: resetDate(in: secondary, now: now, locale: locale),
             primaryWindowSeconds: windowSeconds(in: primary),
             secondaryWindowSeconds: windowSeconds(in: secondary),
             observedAt: now
@@ -69,10 +70,19 @@ public enum UsageDecoder {
 
     private static func windowSeconds(in bucket: [String: Any]?) -> Double? {
         guard let bucket else { return nil }
-        return number(bucket["limit_window_seconds"] ?? bucket["window_seconds"])
+        return firstNumber(bucket["limit_window_seconds"], bucket["window_seconds"])
     }
 
-    private static func resetDate(in bucket: [String: Any]?, now: Date) -> Date? {
+    private static func firstNumber(_ values: Any?...) -> Double? {
+        for value in values {
+            if let number = number(value) {
+                return number
+            }
+        }
+        return nil
+    }
+
+    private static func resetDate(in bucket: [String: Any]?, now: Date, locale: Locale) -> Date? {
         guard let bucket else { return nil }
         if let seconds = number(bucket["reset_after_seconds"]) {
             return now.addingTimeInterval(seconds)
@@ -87,7 +97,7 @@ public enum UsageDecoder {
                 return Date(timeIntervalSince1970: seconds)
             }
             if let text = value as? String {
-                if let date = isoDate(from: text) {
+                if let date = parsedDate(from: text, locale: locale) {
                     return date
                 }
             }
@@ -95,7 +105,7 @@ public enum UsageDecoder {
         return nil
     }
 
-    private static func isoDate(from text: String) -> Date? {
+    private static func parsedDate(from text: String, locale: Locale) -> Date? {
         let fractional = ISO8601DateFormatter()
         fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let date = fractional.date(from: text) {
@@ -105,6 +115,16 @@ public enum UsageDecoder {
             return date
         }
 
+        let monthFirst = ["M/d/yyyy H:mm:ss Z", "M/d/yyyy H:mm:ss"]
+        let dayFirst = ["d/M/yyyy H:mm:ss Z", "d/M/yyyy H:mm:ss"]
+        let datePattern = DateFormatter.dateFormat(fromTemplate: "yMd", options: 0, locale: locale) ?? ""
+        let prefersMonthFirst: Bool
+        if let month = datePattern.firstIndex(of: "M"), let day = datePattern.firstIndex(of: "d") {
+            prefersMonthFirst = month < day
+        } else {
+            prefersMonthFirst = false
+        }
+        let localNumericFormats = prefersMonthFirst ? monthFirst + dayFirst : dayFirst + monthFirst
         let formats = [
             "yyyy-MM-dd HH:mm:ss Z",
             "yyyy-MM-dd HH:mm:ss",
@@ -112,8 +132,9 @@ public enum UsageDecoder {
             "yyyy/M/d H:mm:ss",
             "M/d/yyyy h:mm:ss a Z",
             "M/d/yyyy h:mm:ss a",
+            "yyyy年M月d日 H:mm:ss",
             "EEE, dd MMM yyyy HH:mm:ss zzz",
-        ]
+        ] + localNumericFormats
         for format in formats {
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: "en_US_POSIX")

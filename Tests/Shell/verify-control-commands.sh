@@ -144,7 +144,9 @@ test "$(plutil -extract EnvironmentVariables.CODEX_PET_APP_SUPPORT_DIR raw "$PLI
 if plutil -extract KeepAlive raw "$PLIST" >/dev/null 2>&1; then
   fail "startup must not restart the app after Stop.command"
 fi
-rg -F "bootstrap gui/$(id -u) $PLIST" "$LAUNCH_LOG" >/dev/null || fail "startup did not bootstrap the exact plist"
+if test -f "$LAUNCH_LOG" && rg -F 'bootstrap ' "$LAUNCH_LOG" >/dev/null; then
+  fail "installing startup must not launch the app before the next login"
+fi
 
 run_command "$ROOT/UninstallStartup.command" >/dev/null
 run_command "$ROOT/UninstallStartup.command" >/dev/null

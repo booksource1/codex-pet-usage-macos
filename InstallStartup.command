@@ -34,6 +34,4 @@ plutil -insert StandardOutPath -string "$APP_SUPPORT_DIR/overlay.log" "$TEMP_PLI
 plutil -insert StandardErrorPath -string "$APP_SUPPORT_DIR/overlay.log" "$TEMP_PLIST"
 mv "$TEMP_PLIST" "$PLIST"
 
-launchctl bootout "gui/$(id -u)" "$PLIST" >/dev/null 2>&1 || true
-launchctl bootstrap "gui/$(id -u)" "$PLIST"
-echo "Login startup installed: $PLIST"
+echo "Login startup installed for the next login: $PLIST"

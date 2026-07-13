@@ -24,9 +24,10 @@ let usageDecoderTests: [TestCase] = [
         try expect(usage?.primaryResetAt == fixedDate().addingTimeInterval(60), "alternative relative reset should decode")
     },
     TestCase(name: "nullPreferredAliasesFallThroughLikeReference") {
-        let data = jsonData(#"{"rate_limit":null,"rate_limits":{"primary_window":null,"primary":{"remaining_percent":25}}}"#)
+        let data = jsonData(#"{"rate_limit":null,"rate_limits":{"primary_window":null,"primary":{"remaining_percent":25,"limit_window_seconds":null,"window_seconds":18000}}}"#)
         let usage = try UsageDecoder.decode(data: data, source: .test, now: fixedDate())
         try expectApproximately(usage?.primaryRemaining, 25, "null preferred aliases should fall through to valid alternatives")
+        try expectApproximately(usage?.primaryWindowSeconds, 18_000, "null preferred window seconds should fall through")
     },
     TestCase(name: "percentagesClampToZeroThroughOneHundred") {
         let data = jsonData(#"{"rate_limit":{"primary_window":{"remaining_percent":-4},"secondary_window":{"remaining_percent":140}}}"#)
@@ -63,6 +64,43 @@ let usageDecoderTests: [TestCase] = [
             usage?.primaryResetAt == Date(timeIntervalSince1970: 1_767_269_400),
             "space-separated reset should decode like DateTime.Parse"
         )
+    },
+    TestCase(name: "twelveHourClockWithoutMeridiemMatchesReferenceParsing") {
+        let data = jsonData(#"{"rate_limit":{"primary_window":{"remaining_percent":50,"reset_at":"1/1/2026 12:10:00"}}}"#)
+        let usage = try UsageDecoder.decode(data: data, source: .test, now: fixedDate())
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let expected = calendar.date(from: DateComponents(year: 2026, month: 1, day: 1, hour: 12, minute: 10))
+        try expect(usage?.primaryResetAt == expected, "local numeric reset should decode like DateTime.Parse")
+    },
+    TestCase(name: "naturalLanguageResetMatchesReferenceParsing") {
+        let data = jsonData(#"{"rate_limit":{"primary_window":{"remaining_percent":50,"reset_at":"January 1, 2026 12:10:00 PM"}}}"#)
+        let usage = try UsageDecoder.decode(data: data, source: .test, now: fixedDate())
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let expected = calendar.date(from: DateComponents(year: 2026, month: 1, day: 1, hour: 12, minute: 10))
+        try expect(usage?.primaryResetAt == expected, "natural-language reset should decode like DateTime.Parse")
+    },
+    TestCase(name: "ambiguousNumericResetUsesLocaleDateOrder") {
+        let data = jsonData(#"{"rate_limit":{"primary_window":{"remaining_percent":50,"reset_at":"1/2/2026 12:10:00"}}}"#)
+        let monthFirst = try UsageDecoder.decode(
+            data: data,
+            source: .test,
+            now: fixedDate(),
+            locale: Locale(identifier: "en_PH")
+        )
+        let dayFirst = try UsageDecoder.decode(
+            data: data,
+            source: .test,
+            now: fixedDate(),
+            locale: Locale(identifier: "en_GB")
+        )
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let januarySecond = calendar.date(from: DateComponents(year: 2026, month: 1, day: 2, hour: 12, minute: 10))
+        let februaryFirst = calendar.date(from: DateComponents(year: 2026, month: 2, day: 1, hour: 12, minute: 10))
+        try expect(monthFirst?.primaryResetAt == januarySecond, "month-first locale should parse 1/2 as January 2")
+        try expect(dayFirst?.primaryResetAt == februaryFirst, "day-first locale should parse 1/2 as February 1")
     },
     TestCase(name: "durationRoundsUpLikeReference") {
         try expect(formatDuration(resetAt: fixedDate().addingTimeInterval(60.1), now: fixedDate()) == "1分钟 1秒", "duration should ceil seconds")

@@ -587,7 +587,8 @@ arguments. Tests must prove:
 - repeated start reuses the exact existing bundled executable process;
 - stop terminates only a PID whose resolved executable path matches the bundle;
 - startup install writes one plist under the isolated HOME with the exact current
-  app executable path and calls bootstrap for only its label/domain;
+  app executable path without launching immediately, matching the reference's
+  next-login behavior;
 - startup uninstall calls bootout for only that plist and removes only that file;
 - running install/uninstall twice is idempotent.
 
@@ -617,7 +618,8 @@ writes the minimal Info.plist, and runs
   LatestLog.
 - `InstallStartup.command`: write
   `~/Library/LaunchAgents/ai.jimmyasks.codex-pet-usage-macos.plist` pointing to
-  the app's current absolute executable and load it with `launchctl bootstrap`.
+  the app's current absolute executable. Do not bootstrap it immediately; macOS
+  loads it at the next login, as the reference only registers startup.
 - `UninstallStartup.command`: `bootout` only this label/path and remove only its
   plist.
 

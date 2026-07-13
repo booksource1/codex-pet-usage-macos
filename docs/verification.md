@@ -13,7 +13,7 @@ audited against `CodexPetUsageOverlay.ps1` at that revision.
 
 | Area | Evidence | Result |
 | --- | --- | --- |
-| Usage parsing, fallback, coordinates, hover timing, layout, presentation, configuration, refresh serialization, log policy | `swift run CodexPetUsageTests` | 50 tests passed |
+| Usage parsing, fallback, coordinates, hover timing, layout, presentation, configuration, refresh serialization, log policy | `swift run CodexPetUsageTests` | 53 tests passed |
 | Process identity, missing/stale PID recovery, unrelated-process protection, single-instance behavior, repeated start, LaunchAgent isolation | `bash Tests/Shell/verify-control-commands.sh` | Passed |
 | Bundle metadata | `plutil -lint` and exact-key checks | Passed |
 | Code signature | `codesign --verify --deep --strict --verbose=2` | Valid on disk |
