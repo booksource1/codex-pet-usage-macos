@@ -35,8 +35,9 @@ On every existing 100 ms pet poll, the app also queries on-screen Core Graphics
 window metadata. It obtains the process identifiers of running applications
 whose bundle identifier is `com.openai.codex`, then considers only windows owned
 by those processes. Among those windows, it selects a candidate whose width and
-height match the JSON overlay window within one point. If more than one candidate
-matches, it chooses the frame whose origin is closest to the JSON origin.
+height each match the JSON overlay window within one point. If more than one
+candidate matches, it chooses the frame whose origin is closest to the JSON
+origin; equal-distance candidates retain their Core Graphics input order.
 
 The selected live window origin replaces only the JSON overlay origin. Mascot
 relative coordinates, dimensions, display selection, hover timing, and visual
