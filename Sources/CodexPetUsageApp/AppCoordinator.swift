@@ -94,12 +94,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
             guard !Task.isCancelled else { return }
             usageSnapshot = snapshot
             if snapshot.available {
-                log(String(
-                    format: "Usage updated: source=%@, 5h=%.0f, 7d=%.0f",
-                    snapshot.source.rawValue,
-                    snapshot.primaryRemaining ?? 0,
-                    snapshot.secondaryRemaining ?? 0
-                ))
+                log(usageLogLine(snapshot))
             } else {
                 log("Usage unavailable.")
             }

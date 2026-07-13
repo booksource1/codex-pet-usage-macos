@@ -22,6 +22,37 @@ let overlayPresentationTests: [TestCase] = [
         try expect(model.primaryPercent == 62.6, "primary arc should retain its percentage")
         try expect(model.secondaryPercent == 48.4, "secondary arc should retain its percentage")
     },
+    TestCase(name: "missingWindowUsesDashes") {
+        let now = fixedDate()
+        let snapshot = UsageSnapshot(
+            available: true,
+            source: .test,
+            primaryRemaining: nil,
+            secondaryRemaining: 77,
+            primaryResetAt: now.addingTimeInterval(60),
+            secondaryResetAt: nil,
+            observedAt: now
+        )
+
+        let model = OverlayPresentation.make(snapshot: snapshot, now: now)
+        try expect(model.primary == "5小时 剩余 -- · --后刷新", "missing five-hour window should use dashes")
+        try expect(model.secondary == "7天 剩余 77% · --后刷新", "present seven-day value should retain its percentage")
+        try expect(model.primaryPercent == 0, "missing five-hour value should draw no arc")
+        try expect(model.secondaryPercent == 77, "present seven-day value should draw its arc")
+    },
+    TestCase(name: "missingWindowLogUsesDashes") {
+        let snapshot = UsageSnapshot(
+            available: true,
+            source: .test,
+            primaryRemaining: nil,
+            secondaryRemaining: 77,
+            observedAt: fixedDate()
+        )
+        try expect(
+            usageLogLine(snapshot) == "Usage updated: source=test, 5h=--, 7d=77",
+            "missing windows must not be logged as zero"
+        )
+    },
     TestCase(name: "unavailablePresentationMatchesReferenceStrings") {
         let model = OverlayPresentation.make(snapshot: .unavailable(now: fixedDate()), now: fixedDate())
         try expect(model.title == "Codex 用量", "unavailable title should remain visible")

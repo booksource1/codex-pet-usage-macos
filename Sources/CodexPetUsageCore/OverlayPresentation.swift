@@ -20,12 +20,20 @@ public struct OverlayPresentation: Sendable, Equatable {
             )
         }
 
-        let primaryPercent = clamped(snapshot.primaryRemaining ?? 0)
-        let secondaryPercent = clamped(snapshot.secondaryRemaining ?? 0)
+        let primaryPercent = snapshot.primaryRemaining.map(clamped) ?? 0
+        let secondaryPercent = snapshot.secondaryRemaining.map(clamped) ?? 0
+        let primaryText = snapshot.primaryRemaining.map { "\(integer(clamped($0)))%" } ?? "--"
+        let secondaryText = snapshot.secondaryRemaining.map { "\(integer(clamped($0)))%" } ?? "--"
+        let primaryReset = snapshot.primaryRemaining == nil
+            ? "--"
+            : formatDuration(resetAt: snapshot.primaryResetAt, now: now)
+        let secondaryReset = snapshot.secondaryRemaining == nil
+            ? "--"
+            : formatDuration(resetAt: snapshot.secondaryResetAt, now: now)
         return OverlayPresentation(
             title: "Codex 用量",
-            primary: "5小时 剩余 \(integer(primaryPercent))% · \(formatDuration(resetAt: snapshot.primaryResetAt, now: now))后刷新",
-            secondary: "7天 剩余 \(integer(secondaryPercent))% · \(formatDuration(resetAt: snapshot.secondaryResetAt, now: now))后刷新",
+            primary: "5小时 剩余 \(primaryText) · \(primaryReset)后刷新",
+            secondary: "7天 剩余 \(secondaryText) · \(secondaryReset)后刷新",
             status: "来源 \(snapshot.source.rawValue) · \(clockTime(snapshot.observedAt))",
             primaryPercent: primaryPercent,
             secondaryPercent: secondaryPercent
@@ -46,4 +54,10 @@ public struct OverlayPresentation: Sendable, Equatable {
         formatter.dateFormat = "HH:mm:ss"
         return formatter.string(from: date)
     }
+}
+
+public func usageLogLine(_ snapshot: UsageSnapshot) -> String {
+    let primary = snapshot.primaryRemaining.map { String(Int($0.rounded())) } ?? "--"
+    let secondary = snapshot.secondaryRemaining.map { String(Int($0.rounded())) } ?? "--"
+    return "Usage updated: source=\(snapshot.source.rawValue), 5h=\(primary), 7d=\(secondary)"
 }
