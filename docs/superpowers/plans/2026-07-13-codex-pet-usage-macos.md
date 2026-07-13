@@ -8,6 +8,14 @@
 
 **Tech Stack:** Swift 6.3, Swift Package Manager, Foundation, AppKit/Core Animation, system SQLite3, POSIX shell, XCTest/Swift Testing.
 
+**Environment adaptation (approved 2026-07-13):** This Mac's Command Line Tools
+can compile Apple `Testing.framework` but SwiftPM discovers zero tests because
+the installed testing bundle is incomplete. Use a dependency-free Swift
+executable target named `CodexPetUsageTests` with explicit test registration,
+filtering, nonzero failure status, and execution counts. Throughout this plan,
+`swift run CodexPetUsageTests [filter]` replaces the equivalent `swift test
+--filter ...`; `swift run CodexPetUsageTests` replaces full `swift test` runs.
+
 ---
 
 ## File map
