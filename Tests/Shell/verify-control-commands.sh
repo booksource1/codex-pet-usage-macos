@@ -99,6 +99,9 @@ PLIST="$TEST_HOME/Library/LaunchAgents/$LABEL.plist"
 test -f "$PLIST" || fail "startup plist was not written"
 test "$(plutil -extract Label raw "$PLIST")" = "$LABEL" || fail "startup label is wrong"
 test "$(plutil -extract ProgramArguments.0 raw "$PLIST")" = "$(realpath "$EXECUTABLE")" || fail "startup executable path is wrong"
+if plutil -extract KeepAlive raw "$PLIST" >/dev/null 2>&1; then
+  fail "startup must not restart the app after Stop.command"
+fi
 rg -F "bootstrap gui/$(id -u) $PLIST" "$LAUNCH_LOG" >/dev/null || fail "startup did not bootstrap the exact plist"
 
 run_command "$ROOT/UninstallStartup.command" >/dev/null
