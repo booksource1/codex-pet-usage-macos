@@ -44,14 +44,14 @@ bash scripts/build-app.sh
 ./Stop.command     # 停止精确匹配的本项目进程
 ```
 
-`InstallStartup.command` 和 `UninstallStartup.command` 也只属于源码安装流程，不在下载 ZIP 中。它们分别安装或移除当前用户的 LaunchAgent；安装时不设置 `RunAtLoad` 或 `KeepAlive`，而是监听 `~/.codex/.codex-global-state.json`，在该文件发生 Codex 状态变化后启动浮层。若安装时 Codex 已在运行，脚本会立即对该任务执行 `kickstart`；否则等待后续状态文件变化。这不是常驻轮询助手，不需要管理员权限。移动应用或仓库后请重新安装，关闭该行为可运行：
+`InstallStartup.command` 和 `UninstallStartup.command` 也只属于源码安装流程，不在下载 ZIP 中。它们分别安装或移除当前用户的 LaunchAgent；安装时不设置 `RunAtLoad` 或 `KeepAlive`，而是监听 `$CODEX_HOME/.codex-global-state.json`（默认：`~/.codex/.codex-global-state.json`），在该文件发生 Codex 状态变化后启动浮层。若安装时 Codex 已在运行，脚本会立即对该任务执行 `kickstart`；否则等待后续状态文件变化。这不是常驻轮询助手，不需要管理员权限。移动应用或仓库后请重新安装，关闭该行为可运行：
 
 ```bash
 ./InstallStartup.command
 ./UninstallStartup.command
 ```
 
-The source build requires macOS 14+, Apple Silicon (arm64), and Swift 6/Xcode Command Line Tools. It writes `dist/Codex Pet Usage.app` with an ad-hoc signature. `Start.command`, `Status.command`, and `Stop.command` manage only that exact source-built executable; `InstallStartup.command` and `UninstallStartup.command` add or remove a per-user LaunchAgent without `RunAtLoad` or `KeepAlive`. It watches `~/.codex/.codex-global-state.json` and starts after a Codex state-file change; if Codex is already active when installation runs, the script kickstarts the job immediately, otherwise it waits for a later change. This is not a polling helper and needs no administrator permission.
+The source build requires macOS 14+, Apple Silicon (arm64), and Swift 6/Xcode Command Line Tools. It writes `dist/Codex Pet Usage.app` with an ad-hoc signature. `Start.command`, `Status.command`, and `Stop.command` manage only that exact source-built executable; `InstallStartup.command` and `UninstallStartup.command` add or remove a per-user LaunchAgent without `RunAtLoad` or `KeepAlive`. It watches `$CODEX_HOME/.codex-global-state.json` (default: `~/.codex/.codex-global-state.json`) and starts after a Codex state-file change; if Codex is already active when installation runs, the script kickstarts the job immediately, otherwise it waits for a later change. This is not a polling helper and needs no administrator permission.
 
 ## 可调运行参数 / Runtime overrides
 
