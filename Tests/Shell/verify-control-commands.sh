@@ -131,6 +131,13 @@ if test "${1:-}" = "kickstart" && test -n "${HANDOFF_PID:-}" && kill -0 "$HANDOF
   echo "kickstart called before exact process termination" >&2
   exit 91
 fi
+if test "${1:-}" = "kickstart" && test -f "${LATE_PID_FILE:-}"; then
+  late_pid=$(tr -d '[:space:]' < "$LATE_PID_FILE")
+  if test -n "$late_pid" && kill -0 "$late_pid" 2>/dev/null; then
+    echo "kickstart called before late exact process termination" >&2
+    exit 92
+  fi
+fi
 printf '%s\n' 'CALL' >> "$LAUNCH_LOG"
 printf 'ARG:%s\n' "$@" >> "$LAUNCH_LOG"
 exit 0
@@ -261,6 +268,25 @@ kill -0 "$DECOY_PID" 2>/dev/null || fail "inactive startup install terminated th
 wait "$HANDOFF_PID" 2>/dev/null || true
 HANDOFF_PID=""
 
+EMPTY_LATE_SUPPORT="$TEST_ROOT/empty-first late support"
+EMPTY_LATE_PID_FILE="$TEST_ROOT/empty-first-late.pid"
+EMPTY_LATE_SPAWN_MARKER="$TEST_ROOT/empty-first-late-spawned"
+EMPTY_LATE_SCAN_COUNT_FILE="$TEST_ROOT/empty-first-late-scan-count"
+mkdir -p "$EMPTY_LATE_SUPPORT"
+LATE_EXECUTABLE="$INSTALLED_EXECUTABLE" \
+FIRST_HANDOFF_PID="" \
+LATE_SUPPORT="$EMPTY_LATE_SUPPORT" \
+LATE_PID_FILE="$EMPTY_LATE_PID_FILE" \
+LATE_SPAWN_MARKER="$EMPTY_LATE_SPAWN_MARKER" \
+LATE_SCAN_COUNT_FILE="$EMPTY_LATE_SCAN_COUNT_FILE" \
+CODEX_PET_INSTALLED_APP="$INSTALLED_APP" \
+LSAPPINFO_ACTIVE=1 \
+run_command "$ROOT/InstallStartup.command" >/dev/null
+test -f "$EMPTY_LATE_PID_FILE" || fail "startup install trusted the first empty process scan"
+EMPTY_LATE_PID=$(tr -d '[:space:]' < "$EMPTY_LATE_PID_FILE")
+kill -0 "$EMPTY_LATE_PID" 2>/dev/null && fail "startup install did not terminate the process arriving after an empty scan"
+kill -0 "$DECOY_PID" 2>/dev/null || fail "empty-first handoff terminated the different-path decoy"
+
 HOME="$TEST_HOME" \
 CODEX_HOME="$CODEX_HOME" \
 CODEX_PET_APP_SUPPORT_DIR="$HANDOFF_SUPPORT" \
@@ -294,7 +320,7 @@ CODEX_PET_INSTALLED_APP="$INSTALLED_APP" LSAPPINFO_ACTIVE=1 run_command "$ROOT/I
 test "$(plutil -extract ProgramArguments.0 raw "$PLIST")" = "$(realpath "$INSTALLED_EXECUTABLE")" || fail "startup did not prefer the installed executable"
 test "$(find "$TEST_HOME/Library/LaunchAgents" -type f -name '*.plist' | wc -l | tr -d '[:space:]')" = "1" || fail "switching startup executable wrote more than one plist"
 rm -f "$EXPECTED_LAUNCH_LOG"
-for install in 1 2 3 4 5; do
+for install in 1 2 3 4 5 6; do
   operations=(bootout bootstrap)
   if test "$install" -gt 3; then operations+=(kickstart); fi
   for operation in "${operations[@]}"; do
