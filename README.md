@@ -1,84 +1,105 @@
 # Codex Pet Usage for macOS
 
-一个非常小的原生 macOS 用量徽章：平时完全隐藏，鼠标进入 Codex Desktop 小宠物附近时，短暂显示 5 小时和 7 天用量。
+一个面向 Codex Desktop 的极小原生 macOS 用量浮层：平时隐藏，鼠标移到宠物附近时显示 5 小时和 7 天用量。目标平台为 macOS 14+、Apple Silicon（arm64）。本项目采用 MIT 许可，是非官方独立项目，与 OpenAI 无关。
 
-这是受 [Jimmy-asks-AI/codex-pet-usage](https://github.com/Jimmy-asks-AI/codex-pet-usage) 启发的独立 macOS 重写，采用 MIT 许可，与 OpenAI 无官方关联。
+![用量浮层示例](docs/images/overlay-example.png)
 
-## 功能
+This is a tiny native macOS 14+ (Apple Silicon/arm64) overlay for Codex Desktop. It stays hidden until the pointer reaches the pet, then shows the five-hour and seven-day usage. MIT-licensed, unofficial, and not affiliated with OpenAI.
 
-- 鼠标进入宠物范围外加 24 pt 后显示，10 秒后自动隐藏。
-- 外环显示 5 小时剩余比例，内环显示 7 天剩余比例。
-- 222×88 pt 的小卡片显示百分比、刷新倒计时、数据来源和观察时间。
-- 窗口透明、置顶、点击穿透，不显示 Dock 图标或菜单栏项目。
-- 每 30 秒尝试读取实时用量；失败时读取本地 Codex 日志。
-- 无第三方运行时、UI 框架、分析、更新器或遥测。
+## 功能概览 / Core behavior
 
-## 要求与构建
+- 鼠标进入宠物外扩 24 pt 的范围时显示，离开后最多显示 10 秒；浮层跟随宠物并在屏幕边缘调整位置。
+- 外环表示 5 小时剩余比例，内环表示 7 天剩余比例；222×88 pt 卡片显示百分比、重置倒计时、数据来源和观察时间。
+- 每 30 秒刷新一次用量；实时请求失败时读取本地 Codex 日志。窗口透明、置顶、点击穿透，不显示 Dock 或菜单栏图标。
+- 不含第三方运行时、更新器、分析或遥测。
 
-- macOS 14 或更高版本。
-- 当前验证目标为 Apple Silicon；代码本身不依赖特定 CPU 架构。
-- 构建需要 Swift 6 / Xcode Command Line Tools。
+- Enter the pet’s 24 pt hover area to show the overlay for up to 10 seconds; it follows the pet and moves inward at a screen edge.
+- The outer ring is five-hour remaining usage, the inner ring is seven-day usage; the 222×88 pt card shows percentages, reset countdowns, source, and observation time.
+- Usage refreshes every 30 seconds, falling back to local Codex logs when the live request fails. The transparent, click-through window is not shown in the Dock or menu bar.
+- No third-party runtime, updater, analytics, or telemetry is included.
+
+## 下载预构建版本 / Download a release
+
+发布后可从下面的固定地址下载最新 ZIP（在项目尚未发布 Release 前，该地址会返回 404）：
+
+<https://github.com/Jimmy-asks-AI/codex-pet-usage-macos/releases/latest/download/Codex-Pet-Usage-macOS.zip>
+
+ZIP 只包含 `Codex Pet Usage.app`。解压后将应用拖到 `/Applications`，首次打开时 macOS 可能因这是本地 ad-hoc 签名而显示 Gatekeeper 警告；请在 Finder 中右键应用，选择“打开”，再确认打开。项目没有 Developer ID 签名，也不会要求管理员权限。
+
+After a Release exists, the stable URL above downloads the latest ZIP (before then it returns 404). The ZIP contains only `Codex Pet Usage.app`; unzip it, drag the app to `/Applications`, and on first launch use Finder → right-click → **Open** if Gatekeeper warns about the local ad-hoc signature. There is no Developer ID signature and no administrator prompt.
+
+## 从源码构建 / Build from source
+
+需要 macOS 14+、Apple Silicon（arm64）和 Swift 6 / Xcode Command Line Tools：
 
 ```bash
 bash scripts/build-app.sh
 ```
 
-构建结果位于 `dist/Codex Pet Usage.app`，使用本机 ad-hoc 签名。可双击运行，或执行：
+构建产物为 `dist/Codex Pet Usage.app`，使用本机 ad-hoc 签名。源码树中的控制脚本针对这个 `dist` 路径：
 
 ```bash
-./Start.command
-./Status.command
-./Stop.command
+./Start.command    # 启动（缺少构建产物时先构建）
+./Status.command   # 查看进程、浮层和启动状态
+./Stop.command     # 停止精确匹配的本项目进程
 ```
 
-这些命令只管理当前仓库 `dist` 中完整路径匹配的可执行文件，不会按进程名批量终止其他程序。
-
-## Codex 启动时触发
-
-默认不启用。需要时手动执行：
+`InstallStartup.command` 和 `UninstallStartup.command` 也只属于源码安装流程，不在下载 ZIP 中。它们分别安装或移除当前用户的 LaunchAgent，提供可选的登录后/随 Codex 启动自动运行：LaunchAgent 监听 `~/.codex/.codex-global-state.json` 的变化，在 Codex 启动或状态变化后启动浮层；不是常驻轮询助手，不需要管理员权限。移动应用或仓库后请重新安装，关闭该行为可运行：
 
 ```bash
 ./InstallStartup.command
 ./UninstallStartup.command
 ```
 
-安装命令会立即登记当前用户的 LaunchAgent，并监听 `$CODEX_HOME/.codex-global-state.json`。登记时总会停止路径精确匹配的现有用量进程：若 Codex 正在运行，随后由 launchd 立即启动和持有；若 Codex 未运行，则等待后续 `WatchPaths` 事件再启动。它优先使用 `/Applications/Codex Pet Usage.app`，否则使用仓库内构建，不需要管理员权限，也没有常驻轮询助手。移动仓库或应用、或修改参数后，请重新执行安装命令。
+The source build requires macOS 14+, Apple Silicon (arm64), and Swift 6/Xcode Command Line Tools. It writes `dist/Codex Pet Usage.app` with an ad-hoc signature. `Start.command`, `Status.command`, and `Stop.command` manage only that exact source-built executable; `InstallStartup.command` and `UninstallStartup.command` add or remove the optional login/Codex-triggered per-user LaunchAgent. The agent watches the Codex state file and starts the overlay when Codex changes state, rather than running a polling helper.
 
-## 可调参数
+## 可选的宠物定制 / Optional pet customization
 
-| 环境变量 | 默认值 | 说明 |
-| --- | ---: | --- |
-| `CODEX_HOME` | `~/.codex` | Codex 状态、认证和日志目录 |
-| `CODEX_PET_USAGE_POLL_SECONDS` | `30` | 用量刷新秒数，最低 10 秒 |
-| `CODEX_PET_POLL_MS` | `100` | 宠物位置和悬停轮询毫秒数，最低 50 ms |
-| `CODEX_PET_HOVER_PADDING` | `24` | 宠物外扩命中范围，限制为 0–200 pt |
+以下只是第三方定制示例，不是本仓库的依赖、构建步骤或安装内容；运行前请自行审阅包及其权限：
 
-`CODEX_PET_APP_SUPPORT_DIR` 仅用于隔离测试运行文件；普通使用无需设置。
+```bash
+npx petdex@latest install kun-like
+```
 
-## 数据与隐私
+This is an optional third-party example only. `petdex` and `kun-like` are not dependencies of this repository, and this project does not install or verify them. Review the package before running it.
 
-应用只读取：
+## 隐私与权限 / Privacy and permissions
 
-- `~/.codex/.codex-global-state.json`
-- `~/.codex/auth.json`
-- `~/.codex/logs_2.sqlite` 或 `logs_1.sqlite`
-
-它只写入 `~/Library/Application Support/CodexPetUsageOverlay/overlay.pid` 和 `overlay.log`；明确安装登录启动时，另写入上面的 LaunchAgent plist。
-
-实时查询只访问固定地址 `https://chatgpt.com/backend-api/wham/usage`。该地址是 ChatGPT 的私有、未承诺稳定的端点，未来可能改变或失效。访问令牌只放在这一请求的 Authorization 头中，不写日志、不持久化，也不允许重定向到其他主机。应用不会发送提示词、会话正文、仓库文件、截图或宠物图像。
+应用只读取 `~/.codex/.codex-global-state.json`、`~/.codex/auth.json` 和 `~/.codex/logs_2.sqlite`/`logs_1.sqlite`。它只写入 `~/Library/Application Support/CodexPetUsageOverlay/overlay.pid` 与 `overlay.log`，以及你明确安装的 LaunchAgent plist。实时请求仅访问固定的 `https://chatgpt.com/backend-api/wham/usage`；访问令牌只放在该请求的 `Authorization` 头中，不写日志、不持久化，并拒绝重定向到其他主机。不会发送提示词、会话正文、仓库文件、截图或宠物图像。
 
 不需要 Accessibility、Screen Recording、Input Monitoring、Full Disk Access、Apple Events 或管理员权限。
 
-## 排查
+The app reads only the Codex state, auth, and usage-log files listed above. It writes only its PID/log files and, when explicitly enabled, a user LaunchAgent plist. Live usage uses the fixed HTTPS endpoint above; the token is sent only in that request’s `Authorization` header, never logged or persisted, and redirects to another host are rejected. Prompts, conversation text, repository files, screenshots, and pet images are not sent. No Accessibility, Screen Recording, Input Monitoring, Full Disk Access, Apple Events, or admin permission is required.
 
-- 完全不显示：先在 Codex Desktop 打开 `/pet`，再运行 `./Status.command`，确认 `PetOverlayOpen: true`。
-- 显示“用量暂不可用”：网络实时接口可能不可用，本地日志中也可能还没有 `codex.rate_limits` 事件。查看 `LatestLog`，日志不会包含令牌或响应正文。
-- 双击后提示无法打开：在本机重新运行 `bash scripts/build-app.sh`，再验证 `codesign --verify --deep --strict "dist/Codex Pet Usage.app"`。
-- PID 陈旧：再次运行 `Start.command` 或 `Stop.command` 会在精确路径检查后清理；不会终止占用同一 PID 文件的无关进程。
-- 移动仓库后登录启动失效：重新运行 `InstallStartup.command`。
+## 排查 / Troubleshooting
 
-## 明确边界
+- **没有浮层**：在 Codex Desktop 打开 `/pet`，然后在源码目录运行 `./Status.command`，确认 `PetOverlayOpen: true`；确认鼠标进入宠物附近。
+- **用量不可用**：实时接口可能暂时失败，本地日志也可能尚无 `codex.rate_limits` 事件；查看 `Status.command` 输出的 `LatestLog`。
+- **下载的应用无法打开**：Finder 中右键 `Codex Pet Usage.app` 选择“打开”；源码构建可重新运行 `bash scripts/build-app.sh` 并检查 `codesign --verify --deep --strict "dist/Codex Pet Usage.app"`。
+- **启动后仍没有浮层**：源码目录运行 `./Status.command` 查看 `StartupEnabled` 和 `LaunchAgentPath`；应用或仓库移动后重新运行 `./InstallStartup.command`。
+- **停止或 PID 状态异常**：运行 `./Start.command` 或 `./Stop.command`；脚本只处理路径精确匹配的本项目可执行文件。
 
-本项目没有设置窗口、主题市场、番茄钟、快捷启动器、菜单栏界面、自动更新或数据分析。它也不修改 Codex 文件和宠物，只读取必要状态并绘制一个临时本地徽章。
+- **No overlay:** open `/pet` in Codex Desktop, run `./Status.command` from a source checkout, confirm `PetOverlayOpen: true`, and move the pointer near the pet.
+- **Usage unavailable:** the live endpoint may be unavailable and local logs may not contain a `codex.rate_limits` event yet; inspect `LatestLog` in `Status.command` output.
+- **Downloaded app blocked:** in Finder, right-click `Codex Pet Usage.app` and choose **Open**. For a source build, rerun `bash scripts/build-app.sh` and verify its signature.
+- **Startup stopped working:** check `StartupEnabled` and `LaunchAgentPath` with `./Status.command`; rerun `./InstallStartup.command` after moving the app or checkout.
+- **Stale PID or stop issue:** run `./Start.command` or `./Stop.command`; controls target only the exact project executable path.
 
-验证过程与已知限制见 [docs/verification.md](docs/verification.md)。
+## 开发者 / Developers
+
+在 macOS 14+ arm64 主机上运行：
+
+```bash
+swift run CodexPetUsageTests
+bash Tests/Shell/verify-control-commands.sh
+bash scripts/build-app.sh
+codesign --verify --deep --strict "dist/Codex Pet Usage.app"
+```
+
+贡献、漏洞报告和验证记录： [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) · [docs/verification.md](docs/verification.md)。
+
+On a macOS 14+ arm64 host, run the test harness, shell verifier, release build, and signature check shown above. See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and [docs/verification.md](docs/verification.md) for contribution, private security reporting, and verification details.
+
+## 许可证 / License
+
+[MIT](LICENSE)
