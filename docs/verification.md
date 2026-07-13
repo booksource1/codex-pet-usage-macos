@@ -33,7 +33,7 @@ The following checks are recorded only after exercising the installed bundle wit
 | Leave and re-enter after expiry triggers again | Pending | — |
 | Closing `/pet` hides immediately and clears hover state | Pending | — |
 | Badge tracks pet and moves card left at the display edge | Pending | — |
-| 5-hour/7-day values, countdowns, and source render correctly | Partial | Real refresh logged `source=live, 5h=81, 7d=0`; exact Chinese strings pass presentation tests; visual confirmation pending |
+| 5-hour/7-day values, countdowns, and source render correctly | Partial | Current 604800-second live bucket logged correctly as `source=live, 5h=--, 7d=76`; exact Chinese strings pass presentation tests; visual confirmation pending |
 | Offline live failure falls back to local logs | Automated only | Deterministic live-failure/log-success test passed; the machine network was not disconnected |
 | No Accessibility, Screen Recording, or admin permission | Passed | No sensitive entitlement or plist permission usage string; app launched without a prompt |
 | Live outbound connection is limited to `chatgpt.com` | Passed by code and request tests | Fixed URL and redirect rejection tests passed; no other network construction exists |
