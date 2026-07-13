@@ -2,11 +2,14 @@
 
 ## Data and permission boundary
 
-Codex Pet Usage is a local macOS overlay. It reads only
-`~/.codex/.codex-global-state.json`, `~/.codex/auth.json`, and the
-`~/.codex/logs_2.sqlite`/`~/.codex/logs_1.sqlite` usage databases. It writes only
-its user-scoped PID and operational log files, plus a per-user LaunchAgent plist
-when startup integration is explicitly installed.
+Codex Pet Usage is a local macOS overlay. It reads only the following Codex files
+under `$CODEX_HOME` (which defaults to `~/.codex`):
+`$CODEX_HOME/.codex-global-state.json`, `$CODEX_HOME/auth.json`, and the
+`$CODEX_HOME/logs_2.sqlite`/`$CODEX_HOME/logs_1.sqlite` usage databases. In
+addition, it reads metadata-only window and process bounds to locate Codex; it
+does not read pixels or use Screen Recording. It writes only its user-scoped PID
+and operational log files, plus a per-user LaunchAgent plist when startup
+integration is explicitly installed.
 
 Live usage requests use the fixed HTTPS endpoint
 `https://chatgpt.com/backend-api/wham/usage`. The access token is sent only in
