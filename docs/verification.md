@@ -13,13 +13,14 @@ audited against `CodexPetUsageOverlay.ps1` at that revision.
 
 | Area | Evidence | Result |
 | --- | --- | --- |
-| Usage parsing, duration-based window classification, fallback, coordinates, hover timing, layout, presentation, configuration, refresh serialization, log policy | `swift run CodexPetUsageTests` | 59 tests passed |
+| Usage parsing, duration-based window classification, fallback, coordinates, live-frame correction, window matching, hover timing, layout, presentation, configuration, refresh serialization, log policy | `swift run CodexPetUsageTests` | 69 tests passed, 0 failures |
 | Process identity, missing/stale PID recovery, unrelated-process protection, single-instance behavior, repeated start, LaunchAgent isolation | `bash Tests/Shell/verify-control-commands.sh` | Passed |
+| Codex-triggered startup | Isolated verifier plus `launchctl print gui/501/ai.jimmyasks.codex-pet-usage-macos` | Passed; registered with exactly one state-file watch path, with `RunAtLoad` and `KeepAlive` absent |
 | Bundle metadata | `plutil -lint` and exact-key checks | Passed |
 | Code signature | `codesign --verify --deep --strict --verbose=2` | Valid on disk |
 | Architecture | `file dist/Codex Pet Usage.app/Contents/MacOS/CodexPetUsage` | Mach-O 64-bit arm64 |
 | Shell syntax and prohibited operations | `bash -n` plus verifier scan | Passed |
-| Local installation | Signature and bundle ID checked after copying to `/Applications/Codex Pet Usage.app` | Passed; startup remained disabled |
+| Local installation | Release build copied to `/Applications/Codex Pet Usage.app`; installed signature, plist, executable architecture, and exact-process count checked | Passed; exactly one installed process remained |
 
 ## Real-device checklist
 
@@ -27,12 +28,12 @@ The following checks are recorded only after exercising the installed bundle wit
 
 | Check | Result | Evidence or note |
 | --- | --- | --- |
-| Accessory app runs without Dock/menu-bar item or permission prompt | Passed | Installed process ran; `LSUIElement=true`; no status-item code, sensitive entitlement, UsageDescription, or prompt observed |
+| Accessory app runs without Dock/menu-bar item or permission prompt | Passed | Installed process ran; `LSUIElement=true`; metadata-only `CGWindowList` access returned Codex frames while Accessibility and Screen Capture preflights were both false |
 | Hidden before hover; pet+24 pt entry shows the badge | Partial | `CGWindowList` reported zero on-screen app windows before hover; direct hover still needs human visual confirmation |
 | Badge expires after 10 seconds without extension | Pending | — |
 | Leave and re-enter after expiry triggers again | Pending | — |
 | Closing `/pet` hides immediately and clears hover state | Pending | — |
-| Badge tracks pet and moves card left at the display edge | Pending | — |
+| Badge tracks pet and moves card left at the display edge | Partial | Live-frame origin correction and right-edge card placement pass deterministic tests. Current metadata-only evidence matched JSON overlay `(0, 47, 356, 320)` to the live `com.openai.codex` frame `(0, 47, 356, 320)`, for delta `(0, 0)` and corrected pet rectangle `(5, 145, 80, 87)`; human visual confirmation remains pending |
 | 5-hour/7-day values, countdowns, and source render correctly | Partial | Current 604800-second live bucket logged correctly as `source=live, 5h=--, 7d=76`; exact Chinese strings pass presentation tests; visual confirmation pending |
 | Offline live failure falls back to local logs | Automated only | Deterministic live-failure/log-success test passed; the machine network was not disconnected |
 | No Accessibility, Screen Recording, or admin permission | Passed | No sensitive entitlement or plist permission usage string; app launched without a prompt |
@@ -51,9 +52,9 @@ Direct UI automation against `com.openai.codex` was denied by the host safety po
 | Transparent accessory panel that ignores pointer events | Panel code, `LSUIElement`, and zero-window pre-hover runtime check |
 | Minimal native dependency set | Swift package manifest and clean Release build |
 | PID/log privacy and exact process targeting | Log-policy tests, real lifecycle run, and shell verifier |
-| User-scoped, optional login startup | Isolated fake-`launchctl` tests; real machine remained disabled |
+| User-scoped Codex-triggered startup | Real `gui/501` registration points to the exact `/Applications` executable and one `~/.codex/.codex-global-state.json` `WatchPaths` trigger; `RunAtLoad`/`KeepAlive` are absent. The isolated verifier also covers Codex-active start and exact-process single-instance behavior |
 | Signed `.app`, macOS 14 metadata, arm64 binary | `codesign`, `plutil`, and `file` output |
-| Real hover appearance and timing | Awaiting human visual confirmation because direct Codex UI control is blocked |
+| Real pet alignment | Metadata-only JSON/CGWindow comparison confirms live-frame selection and corrected pet coordinates; hover appearance and timing still await human visual confirmation because direct Codex UI control is blocked |
 
 ## Security boundary
 
