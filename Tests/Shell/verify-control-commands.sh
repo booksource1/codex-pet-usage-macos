@@ -54,6 +54,7 @@ cleanup() {
   fi
   if test -n "${SLEEP_PID:-}" && kill -0 "$SLEEP_PID" 2>/dev/null; then kill -TERM "$SLEEP_PID" 2>/dev/null || true; fi
   if test -n "${HANDOFF_PID:-}" && kill -0 "$HANDOFF_PID" 2>/dev/null; then kill -TERM "$HANDOFF_PID" 2>/dev/null || true; fi
+  if test -n "${DECOY_PID:-}" && kill -0 "$DECOY_PID" 2>/dev/null; then kill -TERM "$DECOY_PID" 2>/dev/null || true; fi
   rm -rf "$TEST_ROOT"
 }
 trap cleanup EXIT
@@ -150,6 +151,23 @@ printf 'ARG:%s\n' "$@" >> "$OPEN_LOG"
 exit 0
 SH
 chmod +x "$FAKE_BIN/open"
+cat > "$FAKE_BIN/ps" <<'SH'
+#!/bin/bash
+/bin/ps "$@"
+if test -n "${LATE_EXECUTABLE:-}" && test ! -e "$LATE_SPAWN_MARKER"; then
+  touch "$LATE_SPAWN_MARKER"
+  for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    kill -0 "$FIRST_HANDOFF_PID" 2>/dev/null || break
+    /bin/sleep 0.01
+  done
+  HOME="$TEST_HOME" \
+  CODEX_HOME="$CODEX_HOME" \
+  CODEX_PET_APP_SUPPORT_DIR="$LATE_SUPPORT" \
+  "$LATE_EXECUTABLE" >/dev/null 2>&1 &
+  printf '%s\n' "$!" > "$LATE_PID_FILE"
+fi
+SH
+chmod +x "$FAKE_BIN/ps"
 export LAUNCH_LOG OPEN_LOG
 
 LOCAL_ONLY_APP="$TEST_ROOT/nonexistent/Codex Pet Usage.app"
@@ -196,6 +214,19 @@ cp "$EXECUTABLE" "$INSTALLED_EXECUTABLE"
 chmod +x "$INSTALLED_EXECUTABLE"
 HANDOFF_SUPPORT="$TEST_ROOT/handoff support"
 mkdir -p "$HANDOFF_SUPPORT"
+DECOY_EXECUTABLE="$TEST_ROOT/decoy/CodexPetUsage"
+DECOY_SUPPORT="$TEST_ROOT/decoy support"
+mkdir -p "$(dirname "$DECOY_EXECUTABLE")" "$DECOY_SUPPORT"
+cp "$EXECUTABLE" "$DECOY_EXECUTABLE"
+chmod +x "$DECOY_EXECUTABLE"
+HOME="$TEST_HOME" \
+CODEX_HOME="$CODEX_HOME" \
+CODEX_PET_APP_SUPPORT_DIR="$DECOY_SUPPORT" \
+"$DECOY_EXECUTABLE" >/dev/null 2>&1 &
+DECOY_PID=$!
+sleep 0.2
+kill -0 "$DECOY_PID" 2>/dev/null || fail "same-basename decoy did not stay running"
+
 HOME="$TEST_HOME" \
 CODEX_HOME="$CODEX_HOME" \
 CODEX_PET_APP_SUPPORT_DIR="$HANDOFF_SUPPORT" \
@@ -206,6 +237,7 @@ sleep 0.2
 kill -0 "$HANDOFF_PID" 2>/dev/null || fail "isolated installed executable did not stay running for handoff test"
 CODEX_PET_INSTALLED_APP="$INSTALLED_APP" LSAPPINFO_ACTIVE=0 run_command "$ROOT/InstallStartup.command" >/dev/null
 kill -0 "$HANDOFF_PID" 2>/dev/null && fail "inactive startup install did not terminate the exact installed process"
+kill -0 "$DECOY_PID" 2>/dev/null || fail "inactive startup install terminated the different-path decoy"
 wait "$HANDOFF_PID" 2>/dev/null || true
 HANDOFF_PID=""
 
@@ -217,8 +249,23 @@ HANDOFF_PID=$!
 export HANDOFF_PID
 sleep 0.2
 kill -0 "$HANDOFF_PID" 2>/dev/null || fail "isolated installed executable did not restart for active handoff test"
-CODEX_PET_INSTALLED_APP="$INSTALLED_APP" LSAPPINFO_ACTIVE=1 run_command "$ROOT/InstallStartup.command" >/dev/null
+LATE_SUPPORT="$TEST_ROOT/late support"
+LATE_PID_FILE="$TEST_ROOT/late.pid"
+LATE_SPAWN_MARKER="$TEST_ROOT/late-spawned"
+mkdir -p "$LATE_SUPPORT"
+LATE_EXECUTABLE="$INSTALLED_EXECUTABLE" \
+FIRST_HANDOFF_PID="$HANDOFF_PID" \
+LATE_SUPPORT="$LATE_SUPPORT" \
+LATE_PID_FILE="$LATE_PID_FILE" \
+LATE_SPAWN_MARKER="$LATE_SPAWN_MARKER" \
+CODEX_PET_INSTALLED_APP="$INSTALLED_APP" \
+LSAPPINFO_ACTIVE=1 \
+run_command "$ROOT/InstallStartup.command" >/dev/null
 kill -0 "$HANDOFF_PID" 2>/dev/null && fail "startup install did not terminate the exact installed process before handoff"
+test -f "$LATE_PID_FILE" || fail "late exact process was not spawned"
+LATE_PID=$(tr -d '[:space:]' < "$LATE_PID_FILE")
+kill -0 "$LATE_PID" 2>/dev/null && fail "startup install did not terminate the late exact process before handoff"
+kill -0 "$DECOY_PID" 2>/dev/null || fail "active startup install terminated the different-path decoy"
 wait "$HANDOFF_PID" 2>/dev/null || true
 HANDOFF_PID=""
 CODEX_PET_INSTALLED_APP="$INSTALLED_APP" LSAPPINFO_ACTIVE=1 run_command "$ROOT/InstallStartup.command" >/dev/null
@@ -239,6 +286,9 @@ for install in 1 2 3 4 5; do
 done
 cmp -s "$EXPECTED_LAUNCH_LOG" "$LAUNCH_LOG" || fail "repeated startup installs made unexpected launchctl calls or split arguments"
 test ! -e "$OPEN_LOG" || fail "startup install must hand off through launchd instead of open"
+kill -TERM "$DECOY_PID"
+wait "$DECOY_PID" 2>/dev/null || true
+DECOY_PID=""
 
 run_command "$ROOT/UninstallStartup.command" >/dev/null
 run_command "$ROOT/UninstallStartup.command" >/dev/null

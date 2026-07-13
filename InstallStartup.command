@@ -35,17 +35,21 @@ find_expected_pids() {
 }
 
 stop_expected_processes() {
-  local pid remaining
-  while read -r pid; do
-    if test -n "$pid"; then kill -TERM "$pid" 2>/dev/null || true; fi
-  done < <(find_expected_pids)
-
+  local found pid remaining
   for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-    remaining=$(find_expected_pids)
-    if test -z "$remaining"; then return 0; fi
+    found=0
+    while read -r pid; do
+      if test -n "$pid"; then
+        found=1
+        kill -TERM "$pid" 2>/dev/null || true
+      fi
+    done < <(find_expected_pids)
+    if test "$found" = "0"; then return 0; fi
     sleep 0.1
   done
 
+  remaining=$(find_expected_pids)
+  if test -z "$remaining"; then return 0; fi
   echo "Codex Pet Usage exact process did not stop." >&2
   return 1
 }
