@@ -3,7 +3,8 @@
 ## Data and permission boundary
 
 Codex Pet Usage is a local macOS overlay. It reads only the following Codex files
-under `$CODEX_HOME` (which defaults to `~/.codex`):
+under `$CODEX_HOME` (which defaults to `~/.codex`; setting `$CODEX_HOME` overrides
+that default):
 `$CODEX_HOME/.codex-global-state.json`, `$CODEX_HOME/auth.json`, and the
 `$CODEX_HOME/logs_2.sqlite`/`$CODEX_HOME/logs_1.sqlite` usage databases. In
 addition, it reads metadata-only window and process bounds to locate Codex; it
@@ -12,7 +13,8 @@ and operational log files, plus a per-user LaunchAgent plist when startup
 integration is explicitly installed.
 
 Live usage requests use the fixed HTTPS endpoint
-`https://chatgpt.com/backend-api/wham/usage`. The access token is sent only in
+`https://chatgpt.com/backend-api/wham/usage`. This is a private, undocumented
+endpoint that may change or stop working. The access token is sent only in
 that request's `Authorization` header. Credentials, request or response bodies,
 and authorization headers are not logged or persisted, and redirects to another
 host are rejected. Prompts, conversation text, repository files, screenshots,
