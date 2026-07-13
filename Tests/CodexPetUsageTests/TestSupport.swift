@@ -2,7 +2,7 @@ import Foundation
 
 struct TestCase: Sendable {
     let name: String
-    let body: @Sendable () throws -> Void
+    let body: @Sendable () async throws -> Void
 }
 
 struct TestFailure: Error, CustomStringConvertible {

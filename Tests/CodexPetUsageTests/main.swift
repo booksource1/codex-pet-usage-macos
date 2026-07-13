@@ -1,7 +1,7 @@
 import Darwin
 import Foundation
 
-let allTests = packageSmokeTests + usageDecoderTests + logUsageReaderTests
+let allTests = packageSmokeTests + usageDecoderTests + logUsageReaderTests + liveUsageClientTests
 let filter = CommandLine.arguments.dropFirst().first
 let selectedTests = allTests.filter { test in
     filter.map { test.name.localizedCaseInsensitiveContains($0) } ?? true
@@ -15,7 +15,7 @@ guard !selectedTests.isEmpty else {
 var failures = 0
 for test in selectedTests {
     do {
-        try test.body()
+        try await test.body()
         print("PASS \(test.name)")
     } catch {
         failures += 1
