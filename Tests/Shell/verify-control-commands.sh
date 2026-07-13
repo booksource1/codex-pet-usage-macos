@@ -44,6 +44,7 @@ APP_SUPPORT="$TEST_ROOT/support"
 CODEX_HOME="$TEST_ROOT/codex"
 FAKE_BIN="$TEST_ROOT/bin"
 LAUNCH_LOG="$TEST_ROOT/launchctl.log"
+OPEN_LOG="$TEST_ROOT/open.log"
 mkdir -p "$TEST_HOME/Library/LaunchAgents" "$APP_SUPPORT" "$CODEX_HOME" "$FAKE_BIN"
 
 cleanup() {
@@ -128,25 +129,66 @@ printf '%s\n' "$*" >> "$LAUNCH_LOG"
 exit 0
 SH
 chmod +x "$FAKE_BIN/launchctl"
-export LAUNCH_LOG
+cat > "$FAKE_BIN/lsappinfo" <<'SH'
+#!/bin/bash
+if test "${LSAPPINFO_ACTIVE:-0}" = "1"; then
+  printf '%s\n' 'ASN:0x0-0x12345:com.openai.codex'
+fi
+exit 0
+SH
+chmod +x "$FAKE_BIN/lsappinfo"
+cat > "$FAKE_BIN/open" <<'SH'
+#!/bin/bash
+printf '%s\n' "$*" >> "$OPEN_LOG"
+exit 0
+SH
+chmod +x "$FAKE_BIN/open"
+export LAUNCH_LOG OPEN_LOG
 
-run_command "$ROOT/InstallStartup.command" >/dev/null
-run_command "$ROOT/InstallStartup.command" >/dev/null
+LOCAL_ONLY_APP="$TEST_ROOT/nonexistent/Codex Pet Usage.app"
+CODEX_PET_INSTALLED_APP="$LOCAL_ONLY_APP" LSAPPINFO_ACTIVE=0 run_command "$ROOT/InstallStartup.command" >/dev/null
+CODEX_PET_INSTALLED_APP="$LOCAL_ONLY_APP" LSAPPINFO_ACTIVE=0 run_command "$ROOT/InstallStartup.command" >/dev/null
 PLIST="$TEST_HOME/Library/LaunchAgents/$LABEL.plist"
 test -f "$PLIST" || fail "startup plist was not written"
 test "$(plutil -extract Label raw "$PLIST")" = "$LABEL" || fail "startup label is wrong"
 test "$(plutil -extract ProgramArguments.0 raw "$PLIST")" = "$(realpath "$EXECUTABLE")" || fail "startup executable path is wrong"
+test "$(plutil -extract WatchPaths.0 raw "$PLIST")" = "$CODEX_HOME/.codex-global-state.json" || fail "startup watch path is wrong"
+if plutil -extract ProgramArguments.1 raw "$PLIST" >/dev/null 2>&1; then
+  fail "startup must not use a polling helper argument"
+fi
+if plutil -extract WatchPaths.1 raw "$PLIST" >/dev/null 2>&1; then
+  fail "startup must watch exactly one path"
+fi
 test "$(plutil -extract EnvironmentVariables.CODEX_HOME raw "$PLIST")" = "$CODEX_HOME" || fail "startup CODEX_HOME is wrong"
 test "$(plutil -extract EnvironmentVariables.CODEX_PET_USAGE_POLL_SECONDS raw "$PLIST")" = "45" || fail "startup usage polling value is wrong"
 test "$(plutil -extract EnvironmentVariables.CODEX_PET_POLL_MS raw "$PLIST")" = "250" || fail "startup pet polling value is wrong"
 test "$(plutil -extract EnvironmentVariables.CODEX_PET_HOVER_PADDING raw "$PLIST")" = "42" || fail "startup hover padding is wrong"
 test "$(plutil -extract EnvironmentVariables.CODEX_PET_APP_SUPPORT_DIR raw "$PLIST")" = "$APP_SUPPORT" || fail "startup app support override is wrong"
 if plutil -extract KeepAlive raw "$PLIST" >/dev/null 2>&1; then
-  fail "startup must not restart the app after Stop.command"
+  fail "startup must not have KeepAlive"
 fi
-if test -f "$LAUNCH_LOG" && rg -F 'bootstrap ' "$LAUNCH_LOG" >/dev/null; then
-  fail "installing startup must not launch the app before the next login"
+if plutil -extract RunAtLoad raw "$PLIST" >/dev/null 2>&1; then
+  fail "startup must not have RunAtLoad"
 fi
+test "$(find "$TEST_HOME/Library/LaunchAgents" -type f -name '*.plist' | wc -l | tr -d '[:space:]')" = "1" || fail "startup wrote more than one plist"
+test "$(rg -Fxc "bootout gui/$(id -u) $PLIST" "$LAUNCH_LOG")" = "2" || fail "local startup install did not bootout the exact plist twice"
+test "$(rg -Fxc "bootstrap gui/$(id -u) $PLIST" "$LAUNCH_LOG")" = "2" || fail "local startup install did not bootstrap the exact plist twice"
+test "$(wc -l < "$LAUNCH_LOG" | tr -d '[:space:]')" = "4" || fail "local startup install made unexpected launchctl calls"
+test ! -e "$OPEN_LOG" || fail "inactive Codex caused the app to open"
+
+INSTALLED_APP="$TEST_ROOT/Applications/Codex Pet Usage.app"
+INSTALLED_EXECUTABLE="$INSTALLED_APP/Contents/MacOS/CodexPetUsage"
+mkdir -p "$(dirname "$INSTALLED_EXECUTABLE")"
+cp "$EXECUTABLE" "$INSTALLED_EXECUTABLE"
+chmod +x "$INSTALLED_EXECUTABLE"
+CODEX_PET_INSTALLED_APP="$INSTALLED_APP" LSAPPINFO_ACTIVE=1 run_command "$ROOT/InstallStartup.command" >/dev/null
+CODEX_PET_INSTALLED_APP="$INSTALLED_APP" LSAPPINFO_ACTIVE=1 run_command "$ROOT/InstallStartup.command" >/dev/null
+test "$(plutil -extract ProgramArguments.0 raw "$PLIST")" = "$(realpath "$INSTALLED_EXECUTABLE")" || fail "startup did not prefer the installed executable"
+test "$(find "$TEST_HOME/Library/LaunchAgents" -type f -name '*.plist' | wc -l | tr -d '[:space:]')" = "1" || fail "switching startup executable wrote more than one plist"
+test "$(rg -Fxc "bootout gui/$(id -u) $PLIST" "$LAUNCH_LOG")" = "4" || fail "repeated startup installs did not bootout exactly once each"
+test "$(rg -Fxc "bootstrap gui/$(id -u) $PLIST" "$LAUNCH_LOG")" = "4" || fail "repeated startup installs did not bootstrap exactly once each"
+test "$(wc -l < "$LAUNCH_LOG" | tr -d '[:space:]')" = "8" || fail "repeated startup installs made unexpected launchctl calls"
+test "$(rg -Fxc -- "-g $INSTALLED_APP" "$OPEN_LOG")" = "2" || fail "active Codex did not open the installed app exactly with -g"
 
 run_command "$ROOT/UninstallStartup.command" >/dev/null
 run_command "$ROOT/UninstallStartup.command" >/dev/null
