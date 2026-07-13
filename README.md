@@ -53,6 +53,19 @@ bash scripts/build-app.sh
 
 The source build requires macOS 14+, Apple Silicon (arm64), and Swift 6/Xcode Command Line Tools. It writes `dist/Codex Pet Usage.app` with an ad-hoc signature. `Start.command`, `Status.command`, and `Stop.command` manage only that exact source-built executable; `InstallStartup.command` and `UninstallStartup.command` add or remove a per-user LaunchAgent without `RunAtLoad` or `KeepAlive`. It watches `~/.codex/.codex-global-state.json` and starts after a Codex state-file change; if Codex is already active when installation runs, the script kickstarts the job immediately, otherwise it waits for a later change. This is not a polling helper and needs no administrator permission.
 
+## 可调运行参数 / Runtime overrides
+
+源码控制脚本会继承这些环境变量；无效值使用默认值：
+
+| 变量 / Variable | 默认值 / Default | 限制 / Limits |
+| --- | ---: | --- |
+| `CODEX_HOME` | `~/.codex` | 非空路径；支持 `~` 展开 |
+| `CODEX_PET_USAGE_POLL_SECONDS` | `30` 秒 / s | 最低 `10`；非有限或无效值使用默认值 |
+| `CODEX_PET_POLL_MS` | `100` 毫秒 / ms | 最低 `50`；无效值使用默认值 |
+| `CODEX_PET_HOVER_PADDING` | `24` pt | 限制为 `0–200` pt；非有限或无效值使用默认值 |
+
+The source control scripts inherit these variables. `CODEX_HOME` selects the Codex directory (default `~/.codex`); the other values control usage polling, pet polling, and hover padding with the defaults and minimums/clamp shown above.
+
 ## 可选的宠物定制 / Optional pet customization
 
 以下只是第三方定制示例，不是本仓库的依赖、构建步骤或安装内容；运行前请自行审阅包及其权限：
@@ -65,11 +78,11 @@ This is an optional third-party example only. `petdex` and `kun-like` are not de
 
 ## 隐私与权限 / Privacy and permissions
 
-应用只读取 `~/.codex/.codex-global-state.json`、`~/.codex/auth.json` 和 `~/.codex/logs_2.sqlite`/`logs_1.sqlite`。它只写入 `~/Library/Application Support/CodexPetUsageOverlay/overlay.pid` 与 `overlay.log`，以及你明确安装的 LaunchAgent plist。实时请求仅访问固定的 `https://chatgpt.com/backend-api/wham/usage`；该地址是 ChatGPT 的私有、未公开文档化端点，未来可能改变或失效。访问令牌只放在该请求的 `Authorization` 头中，不写日志、不持久化，并拒绝重定向到其他主机。不会发送提示词、会话正文、仓库文件、截图或宠物图像。
+应用默认从 `~/.codex` 读取 `.codex-global-state.json`、`auth.json` 和 `logs_2.sqlite`/`logs_1.sqlite`；设置 `CODEX_HOME` 后改用该目录。为定位 Codex 宠物窗口，它还通过 `CGWindow`/`NSWorkspace` 读取窗口边界和所属进程等元数据，不读取窗口像素，也不进行 Screen Recording。它只写入 `~/Library/Application Support/CodexPetUsageOverlay/overlay.pid` 与 `overlay.log`，以及你明确安装的 LaunchAgent plist。实时请求仅访问固定的 `https://chatgpt.com/backend-api/wham/usage`；该地址是 ChatGPT 的私有、未公开文档化端点，未来可能改变或失效。访问令牌只放在该请求的 `Authorization` 头中，不写日志、不持久化，并拒绝重定向到其他主机。不会发送提示词、会话正文、仓库文件、截图或宠物图像。
 
 不需要 Accessibility、Screen Recording、Input Monitoring、Full Disk Access、Apple Events 或管理员权限。
 
-The app reads only the Codex state, auth, and usage-log files listed above. It writes only its PID/log files and, when explicitly enabled, a user LaunchAgent plist. Live usage uses the fixed HTTPS endpoint above; that ChatGPT endpoint is private and undocumented and may change or stop working. The token is sent only in that request’s `Authorization` header, never logged or persisted, and redirects to another host are rejected. Prompts, conversation text, repository files, screenshots, and pet images are not sent. No Accessibility, Screen Recording, Input Monitoring, Full Disk Access, Apple Events, or admin permission is required.
+By default, the app reads `.codex-global-state.json`, `auth.json`, and `logs_2.sqlite`/`logs_1.sqlite` under `~/.codex`; `CODEX_HOME` overrides that directory. To locate the Codex pet window, it also reads metadata-only process and window bounds through `CGWindow`/`NSWorkspace`; it does not read window pixels or use Screen Recording. It writes only its PID/log files and, when explicitly enabled, a user LaunchAgent plist. Live usage uses the fixed HTTPS endpoint above; that ChatGPT endpoint is private and undocumented and may change or stop working. The token is sent only in that request’s `Authorization` header, never logged or persisted, and redirects to another host are rejected. Prompts, conversation text, repository files, screenshots, and pet images are not sent. No Accessibility, Screen Recording, Input Monitoring, Full Disk Access, Apple Events, or admin permission is required.
 
 ## 排查 / Troubleshooting
 
