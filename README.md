@@ -1,10 +1,10 @@
 # Codex Pet Usage for macOS
 
-一个面向 Codex Desktop 的极小原生 macOS 用量浮层：平时隐藏，鼠标移到宠物附近时显示 5 小时和 7 天用量。目标平台为 macOS 14+、Apple Silicon（arm64）。本项目采用 MIT 许可，是非官方独立项目，与 OpenAI 无关。
+一个面向 Codex Desktop 的极小原生 macOS 用量浮层：平时隐藏，鼠标移到宠物附近时显示 5 小时和 7 天用量。目标平台为 macOS 14+、Apple Silicon（arm64）。这是受 [Jimmy-asks-AI/codex-pet-usage](https://github.com/Jimmy-asks-AI/codex-pet-usage) 启发的独立 macOS 重写，采用 MIT 许可，是非官方项目，与 OpenAI 无关。
 
 ![用量浮层示例](docs/images/overlay-example.png)
 
-This is a tiny native macOS 14+ (Apple Silicon/arm64) overlay for Codex Desktop. It stays hidden until the pointer reaches the pet, then shows the five-hour and seven-day usage. MIT-licensed, unofficial, and not affiliated with OpenAI.
+This is a tiny native macOS 14+ (Apple Silicon/arm64) overlay for Codex Desktop. It stays hidden until the pointer reaches the pet, then shows the five-hour and seven-day usage. It is an independent macOS rewrite inspired by [Jimmy-asks-AI/codex-pet-usage](https://github.com/Jimmy-asks-AI/codex-pet-usage), MIT-licensed, unofficial, and not affiliated with OpenAI.
 
 ## 功能概览 / Core behavior
 
@@ -44,14 +44,14 @@ bash scripts/build-app.sh
 ./Stop.command     # 停止精确匹配的本项目进程
 ```
 
-`InstallStartup.command` 和 `UninstallStartup.command` 也只属于源码安装流程，不在下载 ZIP 中。它们分别安装或移除当前用户的 LaunchAgent，提供可选的登录后/随 Codex 启动自动运行：LaunchAgent 监听 `~/.codex/.codex-global-state.json` 的变化，在 Codex 启动或状态变化后启动浮层；不是常驻轮询助手，不需要管理员权限。移动应用或仓库后请重新安装，关闭该行为可运行：
+`InstallStartup.command` 和 `UninstallStartup.command` 也只属于源码安装流程，不在下载 ZIP 中。它们分别安装或移除当前用户的 LaunchAgent；安装时不设置 `RunAtLoad` 或 `KeepAlive`，而是监听 `~/.codex/.codex-global-state.json`，在该文件发生 Codex 状态变化后启动浮层。若安装时 Codex 已在运行，脚本会立即对该任务执行 `kickstart`；否则等待后续状态文件变化。这不是常驻轮询助手，不需要管理员权限。移动应用或仓库后请重新安装，关闭该行为可运行：
 
 ```bash
 ./InstallStartup.command
 ./UninstallStartup.command
 ```
 
-The source build requires macOS 14+, Apple Silicon (arm64), and Swift 6/Xcode Command Line Tools. It writes `dist/Codex Pet Usage.app` with an ad-hoc signature. `Start.command`, `Status.command`, and `Stop.command` manage only that exact source-built executable; `InstallStartup.command` and `UninstallStartup.command` add or remove the optional login/Codex-triggered per-user LaunchAgent. The agent watches the Codex state file and starts the overlay when Codex changes state, rather than running a polling helper.
+The source build requires macOS 14+, Apple Silicon (arm64), and Swift 6/Xcode Command Line Tools. It writes `dist/Codex Pet Usage.app` with an ad-hoc signature. `Start.command`, `Status.command`, and `Stop.command` manage only that exact source-built executable; `InstallStartup.command` and `UninstallStartup.command` add or remove a per-user LaunchAgent without `RunAtLoad` or `KeepAlive`. It watches `~/.codex/.codex-global-state.json` and starts after a Codex state-file change; if Codex is already active when installation runs, the script kickstarts the job immediately, otherwise it waits for a later change. This is not a polling helper and needs no administrator permission.
 
 ## 可选的宠物定制 / Optional pet customization
 
@@ -65,11 +65,11 @@ This is an optional third-party example only. `petdex` and `kun-like` are not de
 
 ## 隐私与权限 / Privacy and permissions
 
-应用只读取 `~/.codex/.codex-global-state.json`、`~/.codex/auth.json` 和 `~/.codex/logs_2.sqlite`/`logs_1.sqlite`。它只写入 `~/Library/Application Support/CodexPetUsageOverlay/overlay.pid` 与 `overlay.log`，以及你明确安装的 LaunchAgent plist。实时请求仅访问固定的 `https://chatgpt.com/backend-api/wham/usage`；访问令牌只放在该请求的 `Authorization` 头中，不写日志、不持久化，并拒绝重定向到其他主机。不会发送提示词、会话正文、仓库文件、截图或宠物图像。
+应用只读取 `~/.codex/.codex-global-state.json`、`~/.codex/auth.json` 和 `~/.codex/logs_2.sqlite`/`logs_1.sqlite`。它只写入 `~/Library/Application Support/CodexPetUsageOverlay/overlay.pid` 与 `overlay.log`，以及你明确安装的 LaunchAgent plist。实时请求仅访问固定的 `https://chatgpt.com/backend-api/wham/usage`；该地址是 ChatGPT 的私有、未公开文档化端点，未来可能改变或失效。访问令牌只放在该请求的 `Authorization` 头中，不写日志、不持久化，并拒绝重定向到其他主机。不会发送提示词、会话正文、仓库文件、截图或宠物图像。
 
 不需要 Accessibility、Screen Recording、Input Monitoring、Full Disk Access、Apple Events 或管理员权限。
 
-The app reads only the Codex state, auth, and usage-log files listed above. It writes only its PID/log files and, when explicitly enabled, a user LaunchAgent plist. Live usage uses the fixed HTTPS endpoint above; the token is sent only in that request’s `Authorization` header, never logged or persisted, and redirects to another host are rejected. Prompts, conversation text, repository files, screenshots, and pet images are not sent. No Accessibility, Screen Recording, Input Monitoring, Full Disk Access, Apple Events, or admin permission is required.
+The app reads only the Codex state, auth, and usage-log files listed above. It writes only its PID/log files and, when explicitly enabled, a user LaunchAgent plist. Live usage uses the fixed HTTPS endpoint above; that ChatGPT endpoint is private and undocumented and may change or stop working. The token is sent only in that request’s `Authorization` header, never logged or persisted, and redirects to another host are rejected. Prompts, conversation text, repository files, screenshots, and pet images are not sent. No Accessibility, Screen Recording, Input Monitoring, Full Disk Access, Apple Events, or admin permission is required.
 
 ## 排查 / Troubleshooting
 
