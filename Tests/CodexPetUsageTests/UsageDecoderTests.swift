@@ -16,6 +16,32 @@ let usageDecoderTests: [TestCase] = [
         try expectApproximately(usage?.secondaryWindowSeconds, 604_800, "secondary window seconds should decode")
         try expect(usage?.primaryResetAt == fixedDate().addingTimeInterval(90), "relative reset should use supplied now")
     },
+    TestCase(name: "sevenDayBucketInPrimarySlotUsesDeclaredDuration") {
+        let data = jsonData(#"{"rate_limit":{"primary_window":{"used_percent":23,"limit_window_seconds":604800}}}"#)
+        let usage = try UsageDecoder.decode(data: data, source: .test, now: fixedDate())
+        try expect(usage?.primaryRemaining == nil, "missing five-hour window must remain missing")
+        try expectApproximately(usage?.secondaryRemaining, 77, "604800-second bucket must be seven-day usage")
+        try expect(usage?.primaryWindowSeconds == nil, "missing five-hour duration must remain missing")
+        try expectApproximately(usage?.secondaryWindowSeconds, 604_800, "seven-day duration must follow the bucket")
+    },
+    TestCase(name: "recognizedBucketsCanAppearInEitherSlot") {
+        let data = jsonData(#"{"rate_limit":{"primary_window":{"remaining_percent":42,"limit_window_seconds":604800},"secondary_window":{"remaining_percent":61,"limit_window_seconds":18000}}}"#)
+        let usage = try UsageDecoder.decode(data: data, source: .test, now: fixedDate())
+        try expectApproximately(usage?.primaryRemaining, 61, "18000-second bucket must be five-hour usage")
+        try expectApproximately(usage?.secondaryRemaining, 42, "604800-second bucket must be seven-day usage")
+    },
+    TestCase(name: "durationlessBucketsRetainLegacyPositions") {
+        let data = jsonData(#"{"rate_limit":{"primary_window":{"remaining_percent":61},"secondary_window":{"remaining_percent":42}}}"#)
+        let usage = try UsageDecoder.decode(data: data, source: .test, now: fixedDate())
+        try expectApproximately(usage?.primaryRemaining, 61, "durationless primary remains five-hour")
+        try expectApproximately(usage?.secondaryRemaining, 42, "durationless secondary remains seven-day")
+    },
+    TestCase(name: "declaredDurationDisablesPositionalInference") {
+        let data = jsonData(#"{"rate_limit":{"primary_window":{"remaining_percent":77,"limit_window_seconds":604800},"secondary_window":{"remaining_percent":55,"limit_window_seconds":3600}}}"#)
+        let usage = try UsageDecoder.decode(data: data, source: .test, now: fixedDate())
+        try expect(usage?.primaryRemaining == nil, "unrecognized bucket must not be inferred as five-hour")
+        try expectApproximately(usage?.secondaryRemaining, 77, "recognized seven-day bucket must survive")
+    },
     TestCase(name: "remainingPercentAndAlternativeNamesAreAccepted") {
         let data = jsonData(#"{"rate_limits":{"primary":{"remaining_percent":12,"window_seconds":18000,"seconds_until_reset":60}}}"#)
         let usage = try UsageDecoder.decode(data: data, source: .test, now: fixedDate())

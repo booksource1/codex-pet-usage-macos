@@ -15,8 +15,9 @@ public enum UsageDecoder {
             return nil
         }
 
-        let primary = firstDictionary(rate["primary_window"], rate["primary"])
-        let secondary = firstDictionary(rate["secondary_window"], rate["secondary"])
+        let rawPrimary = firstDictionary(rate["primary_window"], rate["primary"])
+        let rawSecondary = firstDictionary(rate["secondary_window"], rate["secondary"])
+        let (primary, secondary) = classifiedBuckets(primary: rawPrimary, secondary: rawSecondary)
         let primaryRemaining = remaining(in: primary)
         let secondaryRemaining = remaining(in: secondary)
         guard primaryRemaining != nil || secondaryRemaining != nil else {
@@ -43,6 +44,28 @@ public enum UsageDecoder {
             }
         }
         return nil
+    }
+
+    private static func classifiedBuckets(
+        primary: [String: Any]?,
+        secondary: [String: Any]?
+    ) -> (fiveHour: [String: Any]?, sevenDay: [String: Any]?) {
+        let buckets = [primary, secondary].compactMap { $0 }
+        guard buckets.contains(where: { windowSeconds(in: $0) != nil }) else {
+            return (primary, secondary)
+        }
+
+        var fiveHour: [String: Any]?
+        var sevenDay: [String: Any]?
+        for bucket in buckets {
+            guard let seconds = windowSeconds(in: bucket) else { continue }
+            if seconds == 18_000, fiveHour == nil {
+                fiveHour = bucket
+            } else if seconds == 604_800, sevenDay == nil {
+                sevenDay = bucket
+            }
+        }
+        return (fiveHour, sevenDay)
     }
 
     private static func number(_ value: Any?) -> Double? {
