@@ -82,13 +82,21 @@ public enum UsageDecoder {
                 return Date(timeIntervalSince1970: seconds)
             }
             if let text = value as? String {
-                let formatter = ISO8601DateFormatter()
-                if let date = formatter.date(from: text) {
+                if let date = isoDate(from: text) {
                     return date
                 }
             }
         }
         return nil
+    }
+
+    private static func isoDate(from text: String) -> Date? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractional.date(from: text) {
+            return date
+        }
+        return ISO8601DateFormatter().date(from: text)
     }
 }
 

@@ -25,6 +25,10 @@ rg -F "$LABEL" "$ROOT/scripts/build-app.sh" "$ROOT/InstallStartup.command" "$ROO
 rg -F '"$APP"' "$ROOT/Start.command" >/dev/null || fail "Start.command must quote the app path"
 rg -F '"$EXECUTABLE"' "$ROOT/Start.command" "$ROOT/Stop.command" >/dev/null \
   || fail "process identity checks must quote the executable path"
+for name in CODEX_PET_USAGE_POLL_SECONDS CODEX_PET_POLL_MS CODEX_PET_HOVER_PADDING; do
+  rg -F -- "--env \"$name=" "$ROOT/Start.command" >/dev/null \
+    || fail "Start.command must pass $name to the app"
+done
 
 bash "$ROOT/scripts/build-app.sh"
 test -x "$EXECUTABLE" || fail "bundle executable was not produced"
@@ -56,6 +60,9 @@ run_command() {
   HOME="$TEST_HOME" \
   CODEX_HOME="$CODEX_HOME" \
   CODEX_PET_APP_SUPPORT_DIR="$APP_SUPPORT" \
+  CODEX_PET_USAGE_POLL_SECONDS=45 \
+  CODEX_PET_POLL_MS=250 \
+  CODEX_PET_HOVER_PADDING=42 \
   PATH="$FAKE_BIN:/usr/bin:/bin:/usr/sbin:/sbin" \
   "$@"
 }
@@ -68,6 +75,14 @@ test "$RUNNING_PID" != "999999" && kill -0 "$RUNNING_PID" 2>/dev/null || fail "s
 run_command "$ROOT/Start.command" >/dev/null
 test "$(tr -d '[:space:]' < "$APP_SUPPORT/overlay.pid")" = "$RUNNING_PID" || fail "repeated start did not reuse the process"
 
+rm -f "$APP_SUPPORT/overlay.pid"
+STATUS_WITHOUT_PID=$(run_command "$ROOT/Status.command")
+printf '%s\n' "$STATUS_WITHOUT_PID" | rg -F 'Running: true' >/dev/null || fail "status did not find a running app without its PID file"
+printf '%s\n' "$STATUS_WITHOUT_PID" | rg -F "ProcessId: $RUNNING_PID" >/dev/null || fail "status recovered the wrong process"
+run_command "$ROOT/Start.command" >/dev/null
+test "$(tr -d '[:space:]' < "$APP_SUPPORT/overlay.pid")" = "$RUNNING_PID" || fail "start did not recover the exact process after PID loss"
+
+rm -f "$APP_SUPPORT/overlay.pid"
 run_command "$ROOT/Stop.command" >/dev/null
 for attempt in 1 2 3 4 5 6 7 8 9 10; do
   kill -0 "$RUNNING_PID" 2>/dev/null || break
@@ -99,6 +114,10 @@ PLIST="$TEST_HOME/Library/LaunchAgents/$LABEL.plist"
 test -f "$PLIST" || fail "startup plist was not written"
 test "$(plutil -extract Label raw "$PLIST")" = "$LABEL" || fail "startup label is wrong"
 test "$(plutil -extract ProgramArguments.0 raw "$PLIST")" = "$(realpath "$EXECUTABLE")" || fail "startup executable path is wrong"
+test "$(plutil -extract EnvironmentVariables.CODEX_HOME raw "$PLIST")" = "$CODEX_HOME" || fail "startup CODEX_HOME is wrong"
+test "$(plutil -extract EnvironmentVariables.CODEX_PET_USAGE_POLL_SECONDS raw "$PLIST")" = "45" || fail "startup usage polling value is wrong"
+test "$(plutil -extract EnvironmentVariables.CODEX_PET_POLL_MS raw "$PLIST")" = "250" || fail "startup pet polling value is wrong"
+test "$(plutil -extract EnvironmentVariables.CODEX_PET_HOVER_PADDING raw "$PLIST")" = "42" || fail "startup hover padding is wrong"
 if plutil -extract KeepAlive raw "$PLIST" >/dev/null 2>&1; then
   fail "startup must not restart the app after Stop.command"
 fi

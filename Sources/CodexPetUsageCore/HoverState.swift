@@ -26,7 +26,6 @@ public struct HoverState: Sendable {
         guard let pet else {
             showUntil = nil
             cursorWasInPet = false
-            overlayWasVisible = false
             return false
         }
 

@@ -105,6 +105,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
             primaryMaxY: primaryMaxY
         )
         let wasVisible = hoverState.overlayWasVisible
+        let cursorWasInPet = hoverState.cursorWasInPet
         let isVisible = hoverState.update(
             pet: pet,
             cursor: NSEvent.mouseLocation,
@@ -113,6 +114,9 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         )
 
         guard isVisible, let pet else {
+            if pet != nil, wasVisible {
+                log("Hover display expired; overlay hidden.")
+            }
             panel?.orderOut(nil)
             return
         }
@@ -124,7 +128,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         )
         panel?.orderFrontRegardless()
 
-        if !wasVisible {
+        if hoverState.cursorWasInPet, !cursorWasInPet {
             log(String(
                 format: "Hover trigger: pet=(%.0f,%.0f,%.0f,%.0f), padding=%.0f",
                 pet.topLeftRect.minX,

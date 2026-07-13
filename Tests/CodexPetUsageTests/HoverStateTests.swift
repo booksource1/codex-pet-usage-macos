@@ -50,12 +50,12 @@ let hoverStateTests: [TestCase] = [
         try expect(state.update(pet: hoverPet(), cursor: CGPoint(x: 15, y: 25), now: now.addingTimeInterval(12)), "expired reentry should show")
         try expect(state.showUntil! > firstUntil!, "expired reentry should set a later deadline")
     },
-    TestCase(name: "missingPetClearsAllHoverState") {
+    TestCase(name: "missingPetClearsTriggerStateButKeepsVisibilityMarker") {
         var state = HoverState()
         _ = state.update(pet: hoverPet(), cursor: CGPoint(x: 15, y: 25), now: fixedDate())
         try expect(!state.update(pet: nil, cursor: .zero, now: fixedDate().addingTimeInterval(1)), "missing pet should hide")
         try expect(state.showUntil == nil, "missing pet should clear deadline")
         try expect(!state.cursorWasInPet, "missing pet should clear cursor history")
-        try expect(!state.overlayWasVisible, "missing pet should clear visibility")
+        try expect(state.overlayWasVisible, "reference keeps the prior visibility marker for later expiry logging")
     },
 ]

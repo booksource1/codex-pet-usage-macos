@@ -42,7 +42,7 @@ bash scripts/build-app.sh
 ./UninstallStartup.command
 ```
 
-安装命令只创建当前用户的 `~/Library/LaunchAgents/ai.jimmyasks.codex-pet-usage-macos.plist`，不需要管理员权限，也不会复制或移动应用。移动仓库或应用后，需要重新执行安装命令来更新绝对路径。
+安装命令只创建当前用户的 `~/Library/LaunchAgents/ai.jimmyasks.codex-pet-usage-macos.plist`，不需要管理员权限，也不会复制或移动应用。它会像参考项目一样保存安装时的 `CODEX_HOME`、轮询间隔和悬停范围。移动仓库或应用、或修改这些参数后，需要重新执行安装命令来更新绝对路径和参数。
 
 ## 可调参数
 

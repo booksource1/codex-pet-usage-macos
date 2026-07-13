@@ -12,18 +12,44 @@ LAUNCH_AGENT="$HOME/Library/LaunchAgents/$LABEL.plist"
 CODEX_HOME_VALUE="${CODEX_HOME:-$HOME/.codex}"
 STATE_FILE="$CODEX_HOME_VALUE/.codex-global-state.json"
 
+is_expected_process() {
+  local pid="$1" observed expected
+  case "$pid" in *[!0-9]*|'') return 1 ;; esac
+  kill -0 "$pid" 2>/dev/null || return 1
+  observed=$(ps -p "$pid" -o comm= | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+  test -n "$observed" || return 1
+  observed=$(realpath "$observed" 2>/dev/null) || return 1
+  expected=$(realpath "$EXECUTABLE" 2>/dev/null) || return 1
+  test "$observed" = "$expected"
+}
+
+find_expected_pids() {
+  local expected pid command observed
+  expected=$(realpath "$EXECUTABLE" 2>/dev/null) || return 0
+  ps -ax -o pid=,comm= | while read -r pid command; do
+    case "$command" in
+      */CodexPetUsage|CodexPetUsage)
+        observed=$(realpath "$command" 2>/dev/null || true)
+        if test -n "$observed" && test "$observed" = "$expected"; then printf '%s\n' "$pid"; fi
+        ;;
+    esac
+  done
+}
+
 running=false
 pid=""
 if test -f "$PID_FILE"; then
   candidate=$(tr -d '[:space:]' < "$PID_FILE")
-  if case "$candidate" in *[!0-9]*|'') false ;; *) true ;; esac && kill -0 "$candidate" 2>/dev/null; then
-    observed=$(ps -p "$candidate" -o comm= | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-    observed=$(realpath "$observed" 2>/dev/null || true)
-    expected=$(realpath "$EXECUTABLE" 2>/dev/null || true)
-    if test -n "$observed" && test "$observed" = "$expected"; then
-      running=true
-      pid="$candidate"
-    fi
+  if is_expected_process "$candidate"; then
+    running=true
+    pid="$candidate"
+  fi
+fi
+if test "$running" = false; then
+  candidate=$(find_expected_pids | sed -n '1p')
+  if test -n "$candidate"; then
+    running=true
+    pid="$candidate"
   fi
 fi
 

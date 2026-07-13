@@ -4,11 +4,16 @@ Date: 2026-07-13
 Host: macOS 26.5.1, Apple Silicon arm64  
 Toolchain: Swift 6.3.2, Xcode Command Line Tools
 
+Reference basis: `Jimmy-asks-AI/codex-pet-usage` commit
+`48d8cf7a39296bb86219f65f58062801e8e8014a` (2026-07-08). The Swift behavior,
+constants, strings, process recovery, and startup parameter propagation were
+audited against `CodexPetUsageOverlay.ps1` at that revision.
+
 ## Automated evidence
 
 | Area | Evidence | Result |
 | --- | --- | --- |
-| Usage parsing, fallback, coordinates, hover timing, layout, presentation, configuration, log policy | `swift run CodexPetUsageTests` | 44 tests passed |
+| Usage parsing, fallback, coordinates, hover timing, layout, presentation, configuration, log policy | `swift run CodexPetUsageTests` | 45 tests passed |
 | Process identity, stale PID behavior, unrelated-process protection, repeated start, LaunchAgent isolation | `bash Tests/Shell/verify-control-commands.sh` | Passed |
 | Bundle metadata | `plutil -lint` and exact-key checks | Passed |
 | Code signature | `codesign --verify --deep --strict --verbose=2` | Valid on disk |

@@ -43,6 +43,14 @@ let usageDecoderTests: [TestCase] = [
         let isoUsage = try UsageDecoder.decode(data: iso, source: .test, now: fixedDate())
         try expect(isoUsage?.primaryResetAt == Date(timeIntervalSince1970: 1_767_269_400), "ISO reset should decode")
     },
+    TestCase(name: "fractionalISOResetMatchesReferenceDateParsing") {
+        let data = jsonData(#"{"rate_limit":{"primary_window":{"remaining_percent":50,"reset_at":"2026-01-01T12:10:00.250Z"}}}"#)
+        let usage = try UsageDecoder.decode(data: data, source: .test, now: fixedDate())
+        try expect(
+            usage?.primaryResetAt == Date(timeIntervalSince1970: 1_767_269_400.25),
+            "fractional ISO reset should decode like DateTime.Parse"
+        )
+    },
     TestCase(name: "durationRoundsUpLikeReference") {
         try expect(formatDuration(resetAt: fixedDate().addingTimeInterval(60.1), now: fixedDate()) == "1分钟 1秒", "duration should ceil seconds")
         try expect(formatDuration(resetAt: fixedDate().addingTimeInterval(3_661), now: fixedDate()) == "1小时 1分钟", "hour format should match reference")
