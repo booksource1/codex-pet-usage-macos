@@ -42,7 +42,7 @@ bash scripts/build-app.sh
 ./UninstallStartup.command
 ```
 
-安装命令会立即登记当前用户的 LaunchAgent，并监听 `$CODEX_HOME/.codex-global-state.json`，在 Codex 更新该状态文件时尽力启动应用；若 Codex 当时已运行，也会立即尝试启动。它优先使用 `/Applications/Codex Pet Usage.app`，否则使用仓库内构建，不需要管理员权限，也没有常驻轮询助手。移动仓库或应用、或修改参数后，请重新执行安装命令。
+安装命令会立即登记当前用户的 LaunchAgent，并监听 `$CODEX_HOME/.codex-global-state.json`，在 Codex 更新该状态文件时尽力启动应用；若 Codex 当时已运行，它会停止路径精确匹配的现有用量进程，再交由 launchd 启动和持有。它优先使用 `/Applications/Codex Pet Usage.app`，否则使用仓库内构建，不需要管理员权限，也没有常驻轮询助手。移动仓库或应用、或修改参数后，请重新执行安装命令。
 
 ## 可调参数
 

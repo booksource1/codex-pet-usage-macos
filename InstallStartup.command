@@ -21,6 +21,35 @@ cleanup_temp_plist() {
 }
 trap cleanup_temp_plist EXIT
 
+find_expected_pids() {
+  local expected pid command observed
+  expected=$(realpath "$EXECUTABLE" 2>/dev/null) || return 0
+  ps -ax -o pid=,comm= | while read -r pid command; do
+    case "$command" in
+      */CodexPetUsage|CodexPetUsage)
+        observed=$(realpath "$command" 2>/dev/null || true)
+        if test -n "$observed" && test "$observed" = "$expected"; then printf '%s\n' "$pid"; fi
+        ;;
+    esac
+  done
+}
+
+stop_expected_processes() {
+  local pid remaining
+  while read -r pid; do
+    if test -n "$pid"; then kill -TERM "$pid" 2>/dev/null || true; fi
+  done < <(find_expected_pids)
+
+  for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    remaining=$(find_expected_pids)
+    if test -z "$remaining"; then return 0; fi
+    sleep 0.1
+  done
+
+  echo "Codex Pet Usage exact process did not stop." >&2
+  return 1
+}
+
 if test -x "$INSTALLED_EXECUTABLE"; then
   APP="$INSTALLED_APP"
   EXECUTABLE="$INSTALLED_EXECUTABLE"
@@ -54,18 +83,9 @@ launchctl bootout "$DOMAIN" "$PLIST" >/dev/null 2>&1 || true
 launchctl bootstrap "$DOMAIN" "$PLIST"
 
 CODEX_APP_INFO=$(lsappinfo find bundleID=com.openai.codex 2>/dev/null || true)
+stop_expected_processes
 if test -n "$CODEX_APP_INFO"; then
-  OPEN_ARGUMENTS=(
-    -g "$APP"
-    --env "CODEX_HOME=$CODEX_HOME_VALUE"
-    --env "CODEX_PET_USAGE_POLL_SECONDS=$USAGE_POLL_SECONDS"
-    --env "CODEX_PET_POLL_MS=$PET_POLL_MS"
-    --env "CODEX_PET_HOVER_PADDING=$HOVER_PADDING"
-  )
-  if test -n "${CODEX_PET_APP_SUPPORT_DIR:-}"; then
-    OPEN_ARGUMENTS+=(--env "CODEX_PET_APP_SUPPORT_DIR=$APP_SUPPORT_DIR")
-  fi
-  open "${OPEN_ARGUMENTS[@]}"
+  launchctl kickstart "$DOMAIN/$LABEL"
 fi
 
 echo "Codex-triggered startup installed: $PLIST"

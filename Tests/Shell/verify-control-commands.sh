@@ -11,19 +11,6 @@ fail() {
   exit 1
 }
 
-assert_repeated_calls() {
-  local log="$1" repetitions="$2" expected="$TEST_ROOT/expected-calls.log" argument call
-  shift 2
-  rm -f "$expected"
-  for ((call = 0; call < repetitions; call++)); do
-    printf '%s\n' 'CALL' >> "$expected"
-    for argument in "$@"; do
-      printf 'ARG:%s\n' "$argument" >> "$expected"
-    done
-  done
-  cmp -s "$expected" "$log" || fail "unexpected argument records in $log"
-}
-
 for file in scripts/build-app.sh Start.command Stop.command Status.command InstallStartup.command UninstallStartup.command; do
   test -x "$ROOT/$file" || fail "$file is missing or not executable"
 done
@@ -66,6 +53,7 @@ cleanup() {
     if test -n "$pid" && kill -0 "$pid" 2>/dev/null; then kill -TERM "$pid" 2>/dev/null || true; fi
   fi
   if test -n "${SLEEP_PID:-}" && kill -0 "$SLEEP_PID" 2>/dev/null; then kill -TERM "$SLEEP_PID" 2>/dev/null || true; fi
+  if test -n "${HANDOFF_PID:-}" && kill -0 "$HANDOFF_PID" 2>/dev/null; then kill -TERM "$HANDOFF_PID" 2>/dev/null || true; fi
   rm -rf "$TEST_ROOT"
 }
 trap cleanup EXIT
@@ -138,6 +126,10 @@ SLEEP_PID=""
 
 cat > "$FAKE_BIN/launchctl" <<'SH'
 #!/bin/bash
+if test "${1:-}" = "kickstart" && test -n "${HANDOFF_PID:-}" && kill -0 "$HANDOFF_PID" 2>/dev/null; then
+  echo "kickstart called before exact process termination" >&2
+  exit 91
+fi
 printf '%s\n' 'CALL' >> "$LAUNCH_LOG"
 printf 'ARG:%s\n' "$@" >> "$LAUNCH_LOG"
 exit 0
@@ -202,25 +194,51 @@ INSTALLED_EXECUTABLE="$INSTALLED_APP/Contents/MacOS/CodexPetUsage"
 mkdir -p "$(dirname "$INSTALLED_EXECUTABLE")"
 cp "$EXECUTABLE" "$INSTALLED_EXECUTABLE"
 chmod +x "$INSTALLED_EXECUTABLE"
+HANDOFF_SUPPORT="$TEST_ROOT/handoff support"
+mkdir -p "$HANDOFF_SUPPORT"
+HOME="$TEST_HOME" \
+CODEX_HOME="$CODEX_HOME" \
+CODEX_PET_APP_SUPPORT_DIR="$HANDOFF_SUPPORT" \
+"$INSTALLED_EXECUTABLE" >/dev/null 2>&1 &
+HANDOFF_PID=$!
+export HANDOFF_PID
+sleep 0.2
+kill -0 "$HANDOFF_PID" 2>/dev/null || fail "isolated installed executable did not stay running for handoff test"
+CODEX_PET_INSTALLED_APP="$INSTALLED_APP" LSAPPINFO_ACTIVE=0 run_command "$ROOT/InstallStartup.command" >/dev/null
+kill -0 "$HANDOFF_PID" 2>/dev/null && fail "inactive startup install did not terminate the exact installed process"
+wait "$HANDOFF_PID" 2>/dev/null || true
+HANDOFF_PID=""
+
+HOME="$TEST_HOME" \
+CODEX_HOME="$CODEX_HOME" \
+CODEX_PET_APP_SUPPORT_DIR="$HANDOFF_SUPPORT" \
+"$INSTALLED_EXECUTABLE" >/dev/null 2>&1 &
+HANDOFF_PID=$!
+export HANDOFF_PID
+sleep 0.2
+kill -0 "$HANDOFF_PID" 2>/dev/null || fail "isolated installed executable did not restart for active handoff test"
 CODEX_PET_INSTALLED_APP="$INSTALLED_APP" LSAPPINFO_ACTIVE=1 run_command "$ROOT/InstallStartup.command" >/dev/null
+kill -0 "$HANDOFF_PID" 2>/dev/null && fail "startup install did not terminate the exact installed process before handoff"
+wait "$HANDOFF_PID" 2>/dev/null || true
+HANDOFF_PID=""
 CODEX_PET_INSTALLED_APP="$INSTALLED_APP" LSAPPINFO_ACTIVE=1 run_command "$ROOT/InstallStartup.command" >/dev/null
 test "$(plutil -extract ProgramArguments.0 raw "$PLIST")" = "$(realpath "$INSTALLED_EXECUTABLE")" || fail "startup did not prefer the installed executable"
 test "$(find "$TEST_HOME/Library/LaunchAgents" -type f -name '*.plist' | wc -l | tr -d '[:space:]')" = "1" || fail "switching startup executable wrote more than one plist"
 rm -f "$EXPECTED_LAUNCH_LOG"
-for install in 1 2 3 4; do
-  for operation in bootout bootstrap; do
+for install in 1 2 3 4 5; do
+  operations=(bootout bootstrap)
+  if test "$install" -gt 3; then operations+=(kickstart); fi
+  for operation in "${operations[@]}"; do
     printf '%s\n' 'CALL' >> "$EXPECTED_LAUNCH_LOG"
-    printf 'ARG:%s\n' "$operation" "gui/$(id -u)" "$PLIST" >> "$EXPECTED_LAUNCH_LOG"
+    if test "$operation" = "kickstart"; then
+      printf 'ARG:%s\n' "$operation" "gui/$(id -u)/$LABEL" >> "$EXPECTED_LAUNCH_LOG"
+    else
+      printf 'ARG:%s\n' "$operation" "gui/$(id -u)" "$PLIST" >> "$EXPECTED_LAUNCH_LOG"
+    fi
   done
 done
 cmp -s "$EXPECTED_LAUNCH_LOG" "$LAUNCH_LOG" || fail "repeated startup installs made unexpected launchctl calls or split arguments"
-assert_repeated_calls "$OPEN_LOG" 2 \
-  -g "$INSTALLED_APP" \
-  --env "CODEX_HOME=$CODEX_HOME" \
-  --env "CODEX_PET_USAGE_POLL_SECONDS=45" \
-  --env "CODEX_PET_POLL_MS=250" \
-  --env "CODEX_PET_HOVER_PADDING=42" \
-  --env "CODEX_PET_APP_SUPPORT_DIR=$APP_SUPPORT"
+test ! -e "$OPEN_LOG" || fail "startup install must hand off through launchd instead of open"
 
 run_command "$ROOT/UninstallStartup.command" >/dev/null
 run_command "$ROOT/UninstallStartup.command" >/dev/null
