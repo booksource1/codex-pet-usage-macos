@@ -11,6 +11,19 @@ fail() {
   exit 1
 }
 
+assert_repeated_calls() {
+  local log="$1" repetitions="$2" expected="$TEST_ROOT/expected-calls.log" argument call
+  shift 2
+  rm -f "$expected"
+  for ((call = 0; call < repetitions; call++)); do
+    printf '%s\n' 'CALL' >> "$expected"
+    for argument in "$@"; do
+      printf 'ARG:%s\n' "$argument" >> "$expected"
+    done
+  done
+  cmp -s "$expected" "$log" || fail "unexpected argument records in $log"
+}
+
 for file in scripts/build-app.sh Start.command Stop.command Status.command InstallStartup.command UninstallStartup.command; do
   test -x "$ROOT/$file" || fail "$file is missing or not executable"
 done
@@ -125,7 +138,8 @@ SLEEP_PID=""
 
 cat > "$FAKE_BIN/launchctl" <<'SH'
 #!/bin/bash
-printf '%s\n' "$*" >> "$LAUNCH_LOG"
+printf '%s\n' 'CALL' >> "$LAUNCH_LOG"
+printf 'ARG:%s\n' "$@" >> "$LAUNCH_LOG"
 exit 0
 SH
 chmod +x "$FAKE_BIN/launchctl"
@@ -139,7 +153,8 @@ SH
 chmod +x "$FAKE_BIN/lsappinfo"
 cat > "$FAKE_BIN/open" <<'SH'
 #!/bin/bash
-printf '%s\n' "$*" >> "$OPEN_LOG"
+printf '%s\n' 'CALL' >> "$OPEN_LOG"
+printf 'ARG:%s\n' "$@" >> "$OPEN_LOG"
 exit 0
 SH
 chmod +x "$FAKE_BIN/open"
@@ -171,9 +186,15 @@ if plutil -extract RunAtLoad raw "$PLIST" >/dev/null 2>&1; then
   fail "startup must not have RunAtLoad"
 fi
 test "$(find "$TEST_HOME/Library/LaunchAgents" -type f -name '*.plist' | wc -l | tr -d '[:space:]')" = "1" || fail "startup wrote more than one plist"
-test "$(rg -Fxc "bootout gui/$(id -u) $PLIST" "$LAUNCH_LOG")" = "2" || fail "local startup install did not bootout the exact plist twice"
-test "$(rg -Fxc "bootstrap gui/$(id -u) $PLIST" "$LAUNCH_LOG")" = "2" || fail "local startup install did not bootstrap the exact plist twice"
-test "$(wc -l < "$LAUNCH_LOG" | tr -d '[:space:]')" = "4" || fail "local startup install made unexpected launchctl calls"
+EXPECTED_LAUNCH_LOG="$TEST_ROOT/expected-launchctl.log"
+rm -f "$EXPECTED_LAUNCH_LOG"
+for install in 1 2; do
+  for operation in bootout bootstrap; do
+    printf '%s\n' 'CALL' >> "$EXPECTED_LAUNCH_LOG"
+    printf 'ARG:%s\n' "$operation" "gui/$(id -u)" "$PLIST" >> "$EXPECTED_LAUNCH_LOG"
+  done
+done
+cmp -s "$EXPECTED_LAUNCH_LOG" "$LAUNCH_LOG" || fail "local startup install made unexpected launchctl calls or split arguments"
 test ! -e "$OPEN_LOG" || fail "inactive Codex caused the app to open"
 
 INSTALLED_APP="$TEST_ROOT/Applications/Codex Pet Usage.app"
@@ -185,14 +206,27 @@ CODEX_PET_INSTALLED_APP="$INSTALLED_APP" LSAPPINFO_ACTIVE=1 run_command "$ROOT/I
 CODEX_PET_INSTALLED_APP="$INSTALLED_APP" LSAPPINFO_ACTIVE=1 run_command "$ROOT/InstallStartup.command" >/dev/null
 test "$(plutil -extract ProgramArguments.0 raw "$PLIST")" = "$(realpath "$INSTALLED_EXECUTABLE")" || fail "startup did not prefer the installed executable"
 test "$(find "$TEST_HOME/Library/LaunchAgents" -type f -name '*.plist' | wc -l | tr -d '[:space:]')" = "1" || fail "switching startup executable wrote more than one plist"
-test "$(rg -Fxc "bootout gui/$(id -u) $PLIST" "$LAUNCH_LOG")" = "4" || fail "repeated startup installs did not bootout exactly once each"
-test "$(rg -Fxc "bootstrap gui/$(id -u) $PLIST" "$LAUNCH_LOG")" = "4" || fail "repeated startup installs did not bootstrap exactly once each"
-test "$(wc -l < "$LAUNCH_LOG" | tr -d '[:space:]')" = "8" || fail "repeated startup installs made unexpected launchctl calls"
-test "$(rg -Fxc -- "-g $INSTALLED_APP" "$OPEN_LOG")" = "2" || fail "active Codex did not open the installed app exactly with -g"
+rm -f "$EXPECTED_LAUNCH_LOG"
+for install in 1 2 3 4; do
+  for operation in bootout bootstrap; do
+    printf '%s\n' 'CALL' >> "$EXPECTED_LAUNCH_LOG"
+    printf 'ARG:%s\n' "$operation" "gui/$(id -u)" "$PLIST" >> "$EXPECTED_LAUNCH_LOG"
+  done
+done
+cmp -s "$EXPECTED_LAUNCH_LOG" "$LAUNCH_LOG" || fail "repeated startup installs made unexpected launchctl calls or split arguments"
+assert_repeated_calls "$OPEN_LOG" 2 \
+  -g "$INSTALLED_APP" \
+  --env "CODEX_HOME=$CODEX_HOME" \
+  --env "CODEX_PET_USAGE_POLL_SECONDS=45" \
+  --env "CODEX_PET_POLL_MS=250" \
+  --env "CODEX_PET_HOVER_PADDING=42" \
+  --env "CODEX_PET_APP_SUPPORT_DIR=$APP_SUPPORT"
 
 run_command "$ROOT/UninstallStartup.command" >/dev/null
 run_command "$ROOT/UninstallStartup.command" >/dev/null
 test ! -e "$PLIST" || fail "startup plist was not removed"
-rg -F "bootout gui/$(id -u) $PLIST" "$LAUNCH_LOG" >/dev/null || fail "startup did not bootout the exact plist"
+printf '%s\n' 'CALL' >> "$EXPECTED_LAUNCH_LOG"
+printf 'ARG:%s\n' bootout "gui/$(id -u)" "$PLIST" >> "$EXPECTED_LAUNCH_LOG"
+cmp -s "$EXPECTED_LAUNCH_LOG" "$LAUNCH_LOG" || fail "startup uninstall made unexpected launchctl calls or split arguments"
 
 echo "PASS: control commands and app bundle verified"

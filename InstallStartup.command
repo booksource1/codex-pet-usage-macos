@@ -14,6 +14,12 @@ CODEX_HOME_VALUE="${CODEX_HOME:-$HOME/.codex}"
 USAGE_POLL_SECONDS="${CODEX_PET_USAGE_POLL_SECONDS:-30}"
 PET_POLL_MS="${CODEX_PET_POLL_MS:-100}"
 HOVER_PADDING="${CODEX_PET_HOVER_PADDING:-24}"
+TEMP_PLIST=""
+
+cleanup_temp_plist() {
+  if test -n "$TEMP_PLIST"; then rm -f "$TEMP_PLIST"; fi
+}
+trap cleanup_temp_plist EXIT
 
 if test -x "$INSTALLED_EXECUTABLE"; then
   APP="$INSTALLED_APP"
@@ -41,6 +47,7 @@ fi
 plutil -insert StandardOutPath -string "$APP_SUPPORT_DIR/overlay.log" "$TEMP_PLIST"
 plutil -insert StandardErrorPath -string "$APP_SUPPORT_DIR/overlay.log" "$TEMP_PLIST"
 mv "$TEMP_PLIST" "$PLIST"
+TEMP_PLIST=""
 
 DOMAIN="gui/$(id -u)"
 launchctl bootout "$DOMAIN" "$PLIST" >/dev/null 2>&1 || true
@@ -48,7 +55,17 @@ launchctl bootstrap "$DOMAIN" "$PLIST"
 
 CODEX_APP_INFO=$(lsappinfo find bundleID=com.openai.codex 2>/dev/null || true)
 if test -n "$CODEX_APP_INFO"; then
-  open -g "$APP"
+  OPEN_ARGUMENTS=(
+    -g "$APP"
+    --env "CODEX_HOME=$CODEX_HOME_VALUE"
+    --env "CODEX_PET_USAGE_POLL_SECONDS=$USAGE_POLL_SECONDS"
+    --env "CODEX_PET_POLL_MS=$PET_POLL_MS"
+    --env "CODEX_PET_HOVER_PADDING=$HOVER_PADDING"
+  )
+  if test -n "${CODEX_PET_APP_SUPPORT_DIR:-}"; then
+    OPEN_ARGUMENTS+=(--env "CODEX_PET_APP_SUPPORT_DIR=$APP_SUPPORT_DIR")
+  fi
+  open "${OPEN_ARGUMENTS[@]}"
 fi
 
 echo "Codex-triggered startup installed: $PLIST"
