@@ -110,7 +110,14 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         let pet = CodexStateReader.read(
             codexHome: configuration.codexHome,
             primaryMaxY: primaryMaxY
-        )
+        ).map { geometry in
+            guard let expectedFrame = geometry.overlayTopLeftRect else { return geometry }
+            let liveFrame = CodexWindowLocator.closestFrame(expected: expectedFrame)
+            return geometry.corrected(
+                liveOverlayFrame: liveFrame,
+                primaryMaxY: primaryMaxY
+            )
+        }
         let wasVisible = hoverState.overlayWasVisible
         let cursorWasInPet = hoverState.cursorWasInPet
         let isVisible = hoverState.update(
