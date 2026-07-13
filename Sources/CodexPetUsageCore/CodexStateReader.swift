@@ -5,11 +5,38 @@ public struct PetGeometry: Sendable {
     public let topLeftRect: CGRect
     public let appKitRect: CGRect
     public let displayTopLeftRect: CGRect
+    public let overlayTopLeftRect: CGRect?
 
-    public init(topLeftRect: CGRect, appKitRect: CGRect, displayTopLeftRect: CGRect) {
+    public init(
+        topLeftRect: CGRect,
+        appKitRect: CGRect,
+        displayTopLeftRect: CGRect,
+        overlayTopLeftRect: CGRect? = nil
+    ) {
         self.topLeftRect = topLeftRect
         self.appKitRect = appKitRect
         self.displayTopLeftRect = displayTopLeftRect
+        self.overlayTopLeftRect = overlayTopLeftRect
+    }
+
+    public func corrected(liveOverlayFrame: CGRect?, primaryMaxY: CGFloat) -> PetGeometry {
+        guard let jsonFrame = overlayTopLeftRect, let liveOverlayFrame else { return self }
+
+        let correctedTopLeft = topLeftRect.offsetBy(
+            dx: liveOverlayFrame.minX - jsonFrame.minX,
+            dy: liveOverlayFrame.minY - jsonFrame.minY
+        )
+        return PetGeometry(
+            topLeftRect: correctedTopLeft,
+            appKitRect: CGRect(
+                x: correctedTopLeft.minX,
+                y: primaryMaxY - correctedTopLeft.minY - correctedTopLeft.height,
+                width: correctedTopLeft.width,
+                height: correctedTopLeft.height
+            ),
+            displayTopLeftRect: displayTopLeftRect,
+            overlayTopLeftRect: liveOverlayFrame
+        )
     }
 }
 
@@ -57,10 +84,16 @@ public enum CodexStateReader {
             width: number(display?["width"]) ?? 1920,
             height: number(display?["height"]) ?? 1080
         )
+        let overlayRect: CGRect? = if let width = number(bounds["width"]), let height = number(bounds["height"]) {
+            CGRect(x: left, y: top, width: width, height: height)
+        } else {
+            nil
+        }
         return PetGeometry(
             topLeftRect: topLeftRect,
             appKitRect: appKitRect,
-            displayTopLeftRect: displayRect
+            displayTopLeftRect: displayRect,
+            overlayTopLeftRect: overlayRect
         )
     }
 
