@@ -10,9 +10,16 @@ final class AppLogger {
 
     private let processID = getpid()
 
-    init(fileManager: FileManager = .default) throws {
-        appDirectory = fileManager.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/CodexPetUsageOverlay", isDirectory: true)
+    init(
+        fileManager: FileManager = .default,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) throws {
+        if let override = environment["CODEX_PET_APP_SUPPORT_DIR"], !override.isEmpty {
+            appDirectory = URL(fileURLWithPath: override, isDirectory: true)
+        } else {
+            appDirectory = fileManager.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Application Support/CodexPetUsageOverlay", isDirectory: true)
+        }
         pidURL = appDirectory.appendingPathComponent("overlay.pid")
         logURL = appDirectory.appendingPathComponent("overlay.log")
 
