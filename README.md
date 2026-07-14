@@ -59,12 +59,12 @@ The source build requires macOS 14+, Apple Silicon (arm64), and Swift 6/Xcode Co
 
 | 变量 / Variable | 默认值 / Default | 限制 / Limits |
 | --- | ---: | --- |
-| `CODEX_HOME` | `~/.codex` | 非空路径；支持 `~` 展开 |
+| `CODEX_HOME` | `~/.codex` | 非空绝对路径；自定义时不要使用字面 `~` / non-empty absolute path; do not use a literal `~` |
 | `CODEX_PET_USAGE_POLL_SECONDS` | `30` 秒 / s | 最低 `10`；非有限或无效值使用默认值 |
 | `CODEX_PET_POLL_MS` | `100` 毫秒 / ms | 最低 `50`；无效值使用默认值 |
 | `CODEX_PET_HOVER_PADDING` | `24` pt | 限制为 `0–200` pt；非有限或无效值使用默认值 |
 
-The source control scripts inherit these variables. `CODEX_HOME` selects the Codex directory (default `~/.codex`); the other values control usage polling, pet polling, and hover padding with the defaults and minimums/clamp shown above.
+The source control scripts inherit these variables. `CODEX_HOME` selects the Codex directory (default `~/.codex`); when customized, use a non-empty absolute path rather than a literal `~`. The other values control usage polling, pet polling, and hover padding with the defaults and minimums/clamp shown above.
 
 ## 可选的宠物定制 / Optional pet customization
 
