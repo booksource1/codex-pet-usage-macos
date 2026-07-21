@@ -22,7 +22,7 @@ This is a tiny native macOS 14+ (Apple Silicon/arm64) overlay for Codex Desktop.
 
 发布后可从下面的固定地址下载最新 ZIP（在项目尚未发布 Release 前，该地址会返回 404）：
 
-<https://github.com/Jimmy-asks-AI/codex-pet-usage-macos/releases/latest/download/Codex-Pet-Usage-macOS.zip>
+<https://github.com/booksource1/codex-pet-usage-macos/releases/latest/download/Codex-Pet-Usage-macOS.zip>
 
 ZIP 只包含 `Codex Pet Usage.app`。解压后将应用拖到 `/Applications`，首次打开时 macOS 可能因这是本地 ad-hoc 签名而显示 Gatekeeper 警告；请在 Finder 中右键应用，选择“打开”，再确认打开。项目没有 Developer ID 签名，也不会要求管理员权限。
 

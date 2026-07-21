@@ -8,7 +8,7 @@ commands from the repository root on macOS 14 or later with an Apple Silicon
 
 | Check | Evidence |
 | --- | --- |
-| Swift behavior | `swift run CodexPetUsageTests` — 69 tests passed, 0 failures. The harness covers usage decoding and fallback, window matching and geometry, hover timing, layout and presentation, runtime configuration, refresh serialization, and log policy. |
+| Swift behavior | `swift run CodexPetUsageTests` — 71 tests passed, 0 failures. The harness covers usage decoding and fallback, window matching and geometry, hover timing, layout and presentation, runtime configuration, refresh serialization, and log policy. |
 | Control scripts | `bash Tests/Shell/verify-control-commands.sh` — passed. It checks exact executable identity, stale or missing PID recovery, repeated starts, unrelated-process protection, late-process handoff, failure-closed discovery, and LaunchAgent isolation. |
 | Build and bundle | `bash scripts/build-app.sh`, plist checks, `codesign --verify --deep --strict`, and an `arm64` binary check pass for the generated app. |
 | Permission boundary | The accessory app uses metadata-only window inspection and launches without Accessibility, Screen Recording, Input Monitoring, Full Disk Access, Apple Events, or administrator permissions. |
