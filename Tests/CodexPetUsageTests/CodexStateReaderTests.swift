@@ -49,6 +49,31 @@ private let nestedDisplayState = Data(#"""
 }
 """#.utf8)
 
+private let currentTopLevelPositionState = Data(#"""
+{
+  "electron-avatar-overlay-open": true,
+  "electron-avatar-overlay-bounds": {
+    "x": 1648.1875, "y": 876.81640625,
+    "displayId": 3, "placement": "top-end",
+    "displayBounds": {"x": 0, "y": 0, "width": 1920, "height": 1080},
+    "byDisplayId": {
+      "23": {
+        "x": 1564, "y": 87, "width": 356, "height": 320,
+        "mascot": {"left": 243, "top": 63, "width": 113, "height": 122}
+      },
+      "24": {
+        "x": 1472, "y": 143, "width": 356, "height": 320,
+        "mascot": {"left": 215, "top": 63, "width": 113, "height": 122}
+      },
+      "37": {
+        "x": 1342, "y": 137, "width": 356, "height": 320,
+        "mascot": {"left": 248, "top": 8, "width": 80, "height": 87}
+      }
+    }
+  }
+}
+"""#.utf8)
+
 let codexStateReaderTests: [TestCase] = [
     TestCase(name: "openPetProducesGlobalTopLeftAndAppKitRects") {
         let pet = CodexStateReader.decode(data: openPetState, primaryMaxY: 1080)
@@ -57,12 +82,17 @@ let codexStateReaderTests: [TestCase] = [
         try expect(pet?.displayTopLeftRect == CGRect(x: 0, y: 0, width: 1920, height: 1080), "display bounds should decode")
         try expect(pet?.overlayTopLeftRect == CGRect(x: 1524, y: 0, width: 356, height: 320), "overlay frame should be retained")
     },
-    TestCase(name: "nestedDisplayStateSelectsNearestMascotGeometry") {
+    TestCase(name: "nestedDisplayStateUsesCurrentTopLevelPosition") {
         let pet = CodexStateReader.decode(data: nestedDisplayState, primaryMaxY: 1080)
-        try expect(pet?.topLeftRect == CGRect(x: 1807, y: 150, width: 113, height: 122), "nearest nested mascot should become the pet rect")
-        try expect(pet?.appKitRect == CGRect(x: 1807, y: 808, width: 113, height: 122), "nested mascot should convert to AppKit coordinates")
+        try expect(pet?.topLeftRect == CGRect(x: 1746, y: 165, width: 80, height: 87), "current top-level position should become the pet rect")
+        try expect(pet?.appKitRect == CGRect(x: 1746, y: 828, width: 80, height: 87), "current top-level pet should convert to AppKit coordinates")
         try expect(pet?.displayTopLeftRect == CGRect(x: 0, y: 0, width: 1920, height: 1080), "nested display bounds should decode")
-        try expect(pet?.overlayTopLeftRect == CGRect(x: 1564, y: 87, width: 356, height: 320), "nearest nested overlay frame should be retained")
+        try expect(pet?.overlayTopLeftRect == nil, "historical nested geometry should not be used as the live overlay frame")
+    },
+    TestCase(name: "currentTopLevelPositionDoesNotUseHistoricalNestedGeometry") {
+        let pet = CodexStateReader.decode(data: currentTopLevelPositionState, primaryMaxY: 1080)
+        try expect(pet?.topLeftRect == CGRect(x: 1648.1875, y: 876.81640625, width: 80, height: 87), "current top-level position should anchor the current pet")
+        try expect(pet?.appKitRect == CGRect(x: 1648.1875, y: 116.18359375, width: 80, height: 87), "current top-level pet should convert to AppKit coordinates")
     },
     TestCase(name: "liveOverlayOriginCorrectsStaleJSONGeometry") {
         guard let pet = CodexStateReader.decode(data: staleOverlayState, primaryMaxY: 1080) else {

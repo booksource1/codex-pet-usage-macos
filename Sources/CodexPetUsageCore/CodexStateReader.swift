@@ -107,29 +107,41 @@ public enum CodexStateReader {
             return nil
         }
 
-        let origin = CGPoint(
-            x: number(bounds["x"]) ?? 0,
-            y: number(bounds["y"]) ?? 0
-        )
-        return byDisplayID.keys.sorted().compactMap { key in
+        guard number(bounds["x"]) != nil, number(bounds["y"]) != nil else {
+            return byDisplayID.keys.sorted().compactMap { key -> [String: Any]? in
+                guard let candidate = byDisplayID[key] as? [String: Any], candidate["mascot"] is [String: Any] else {
+                    return nil
+                }
+                return candidate
+            }.first
+        }
+
+        let mascotSize = byDisplayID.values.compactMap { value -> CGSize? in
             guard
-                let candidate = byDisplayID[key] as? [String: Any],
-                candidate["mascot"] is [String: Any],
-                number(candidate["x"]) != nil,
-                number(candidate["y"]) != nil
+                let candidate = value as? [String: Any],
+                let mascot = candidate["mascot"] as? [String: Any],
+                let width = number(mascot["width"]),
+                let height = number(mascot["height"])
             else {
                 return nil
             }
-            return candidate
+            return CGSize(width: width, height: height)
         }.min { lhs, rhs in
-            distanceSquared(from: lhs, to: origin) < distanceSquared(from: rhs, to: origin)
-        }
-    }
+            lhs.width * lhs.height < rhs.width * rhs.height
+        } ?? CGSize(width: 80, height: 87)
 
-    private static func distanceSquared(from bounds: [String: Any], to point: CGPoint) -> CGFloat {
-        let dx = (number(bounds["x"]) ?? 0) - point.x
-        let dy = (number(bounds["y"]) ?? 0) - point.y
-        return dx * dx + dy * dy
+        // New Codex versions keep the current pet origin at the top level and
+        // retain older per-display mascot geometry in byDisplayId.
+        var currentBounds = bounds
+        currentBounds["mascot"] = [
+            "left": 0,
+            "top": 0,
+            "width": mascotSize.width,
+            "height": mascotSize.height,
+        ]
+        currentBounds.removeValue(forKey: "width")
+        currentBounds.removeValue(forKey: "height")
+        return currentBounds
     }
 
     private static func number(_ value: Any?) -> CGFloat? {
