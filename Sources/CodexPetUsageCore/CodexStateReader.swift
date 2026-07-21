@@ -52,7 +52,8 @@ public enum CodexStateReader {
             let object = try? JSONSerialization.jsonObject(with: data),
             let root = object as? [String: Any],
             root["electron-avatar-overlay-open"] as? Bool == true,
-            let bounds = root["electron-avatar-overlay-bounds"] as? [String: Any],
+            let rawBounds = root["electron-avatar-overlay-bounds"] as? [String: Any],
+            let bounds = boundsWithMascot(from: rawBounds),
             let mascot = bounds["mascot"] as? [String: Any],
             let mascotLeft = number(mascot["left"]),
             let mascotTop = number(mascot["top"]),
@@ -95,6 +96,40 @@ public enum CodexStateReader {
             displayTopLeftRect: displayRect,
             overlayTopLeftRect: overlayRect
         )
+    }
+
+    private static func boundsWithMascot(from bounds: [String: Any]) -> [String: Any]? {
+        if bounds["mascot"] is [String: Any] {
+            return bounds
+        }
+
+        guard let byDisplayID = bounds["byDisplayId"] as? [String: Any] else {
+            return nil
+        }
+
+        let origin = CGPoint(
+            x: number(bounds["x"]) ?? 0,
+            y: number(bounds["y"]) ?? 0
+        )
+        return byDisplayID.keys.sorted().compactMap { key in
+            guard
+                let candidate = byDisplayID[key] as? [String: Any],
+                candidate["mascot"] is [String: Any],
+                number(candidate["x"]) != nil,
+                number(candidate["y"]) != nil
+            else {
+                return nil
+            }
+            return candidate
+        }.min { lhs, rhs in
+            distanceSquared(from: lhs, to: origin) < distanceSquared(from: rhs, to: origin)
+        }
+    }
+
+    private static func distanceSquared(from bounds: [String: Any], to point: CGPoint) -> CGFloat {
+        let dx = (number(bounds["x"]) ?? 0) - point.x
+        let dy = (number(bounds["y"]) ?? 0) - point.y
+        return dx * dx + dy * dy
     }
 
     private static func number(_ value: Any?) -> CGFloat? {

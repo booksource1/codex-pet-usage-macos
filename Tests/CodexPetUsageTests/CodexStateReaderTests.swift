@@ -23,6 +23,32 @@ private let staleOverlayState = Data(#"""
 }
 """#.utf8)
 
+private let nestedDisplayState = Data(#"""
+{
+  "electron-avatar-overlay-open": true,
+  "electron-avatar-overlay-bounds": {
+    "x": 1746, "y": 165, "displayId": 3,
+    "displayBounds": {"x": 0, "y": 0, "width": 1920, "height": 1080},
+    "byDisplayId": {
+      "3": {
+        "displayId": 3, "x": 1746, "y": 165,
+        "displayBounds": {"x": 0, "y": 0, "width": 1920, "height": 1080}
+      },
+      "23": {
+        "displayId": 23, "x": 1564, "y": 87, "width": 356, "height": 320,
+        "mascot": {"left": 243, "top": 63, "width": 113, "height": 122},
+        "displayBounds": {"x": 0, "y": 0, "width": 1920, "height": 1080}
+      },
+      "42": {
+        "displayId": 42, "x": 1472, "y": 0, "width": 356, "height": 320,
+        "mascot": {"left": 248, "top": 31, "width": 80, "height": 87},
+        "displayBounds": {"x": 0, "y": 0, "width": 1920, "height": 1080}
+      }
+    }
+  }
+}
+"""#.utf8)
+
 let codexStateReaderTests: [TestCase] = [
     TestCase(name: "openPetProducesGlobalTopLeftAndAppKitRects") {
         let pet = CodexStateReader.decode(data: openPetState, primaryMaxY: 1080)
@@ -30,6 +56,13 @@ let codexStateReaderTests: [TestCase] = [
         try expect(pet?.appKitRect == CGRect(x: 1775, y: 984, width: 77, height: 83), "AppKit rect should flip around primary top edge")
         try expect(pet?.displayTopLeftRect == CGRect(x: 0, y: 0, width: 1920, height: 1080), "display bounds should decode")
         try expect(pet?.overlayTopLeftRect == CGRect(x: 1524, y: 0, width: 356, height: 320), "overlay frame should be retained")
+    },
+    TestCase(name: "nestedDisplayStateSelectsNearestMascotGeometry") {
+        let pet = CodexStateReader.decode(data: nestedDisplayState, primaryMaxY: 1080)
+        try expect(pet?.topLeftRect == CGRect(x: 1807, y: 150, width: 113, height: 122), "nearest nested mascot should become the pet rect")
+        try expect(pet?.appKitRect == CGRect(x: 1807, y: 808, width: 113, height: 122), "nested mascot should convert to AppKit coordinates")
+        try expect(pet?.displayTopLeftRect == CGRect(x: 0, y: 0, width: 1920, height: 1080), "nested display bounds should decode")
+        try expect(pet?.overlayTopLeftRect == CGRect(x: 1564, y: 87, width: 356, height: 320), "nearest nested overlay frame should be retained")
     },
     TestCase(name: "liveOverlayOriginCorrectsStaleJSONGeometry") {
         guard let pet = CodexStateReader.decode(data: staleOverlayState, primaryMaxY: 1080) else {
